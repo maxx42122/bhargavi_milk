@@ -1,0 +1,379 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================
+    // HELPER FUNCTIONS
+    // ============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isDistributor(distributorId) {
+      return isAuthenticated()
+        && request.auth.uid == distributorId;
+    }
+
+    function isShopOwner(shopId) {
+      return isAuthenticated()
+        && request.auth.uid == shopId;
+    }
+
+    // Check whether a shop belongs to this distributor.
+    function shopExists(distributorId, shopId) {
+      return exists(
+        /databases/$(database)/documents/distributor/$(distributorId)/shops/$(shopId)
+      );
+    }
+
+    // Check whether the shop is approved.
+    function isApprovedShop(distributorId, shopId) {
+      return shopExists(distributorId, shopId)
+        && get(
+          /databases/$(database)/documents/distributor/$(distributorId)/shops/$(shopId)
+        ).data.status == 'approved';
+    }
+
+
+    // ============================================================
+    // DISTRIBUTOR
+    //
+    // /distributor/{distributorId}
+    // ============================================================
+
+    match /distributor/{distributorId} {
+
+      // ----------------------------------------------------------
+      // DISTRIBUTOR PROFILE
+      // ----------------------------------------------------------
+
+      // Anyone can read distributor list.
+      allow read: if true;
+
+      // Only the distributor can create/update/delete
+      // their own distributor profile.
+      allow create, update, delete:
+        if isDistributor(distributorId);
+
+
+      // ==========================================================
+      // PRODUCTS
+      //
+      // /distributor/{distributorId}/products/{productId}
+      // ==========================================================
+
+      match /products/{productId} {
+
+        // Anyone can read product catalog.
+        allow read: if true;
+
+        // Only distributor can manage products.
+        allow create, update, delete:
+          if isDistributor(distributorId);
+      }
+
+
+      // ==========================================================
+      // SHOPS
+      //
+      // /distributor/{distributorId}/shops/{shopId}
+      // ==========================================================
+
+      match /shops/{shopId} {
+
+        // --------------------------------------------------------
+        // READ
+        // --------------------------------------------------------
+        //
+        // Distributor can read all their shops.
+        // Shop can read only itself.
+        //
+        allow read:
+          if isDistributor(distributorId)
+          || isShopOwner(shopId);
+
+
+        // --------------------------------------------------------
+        // CREATE
+        // --------------------------------------------------------
+        //
+        // A shop can create its own registration.
+        //
+        // Required:
+        //   shopId == authenticated UID
+        //   distributorId == URL distributorId
+        //   status == pending
+        //
+        allow create:
+          if isShopOwner(shopId)
+          && request.resource.data.shopId == shopId
+          && request.resource.data.distributorId == distributorId
+          && request.resource.data.status == 'pending';
+
+
+        // --------------------------------------------------------
+        // UPDATE
+        // --------------------------------------------------------
+        //
+        // Distributor:
+        //   Can approve/reject/update the shop.
+        //
+        // Shop:
+        //   Can update profile fields but CANNOT change:
+        //     status
+        //     role
+        //     distributorId
+        //     uid
+        //     shopId
+        //     financial/statistical fields
+        //
+        allow update:
+          if isDistributor(distributorId)
+          ||
+          (
+            isShopOwner(shopId)
+            &&
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+              'status',
+              'role',
+              'distributorId',
+              'uid',
+              'shopId',
+              'totalOrders',
+              'totalPurchase',
+              'paidAmount',
+              'outstanding'
+            ])
+          );
+
+
+        // --------------------------------------------------------
+        // DELETE
+        // --------------------------------------------------------
+        //
+        // Only distributor can delete a shop.
+        //
+        allow delete:
+          if isDistributor(distributorId);
+      }
+
+
+      // ==========================================================
+      // ORDERS
+      //
+      // /distributor/{distributorId}/orders/{orderId}
+      // ==========================================================
+
+      match /orders/{orderId} {
+
+        // --------------------------------------------------------
+        // READ
+        // --------------------------------------------------------
+        //
+        // Distributor can read all orders.
+        // Shop can read only its own orders.
+        //
+        allow read:
+          if isAuthenticated()
+          &&
+          (
+            isDistributor(distributorId)
+            ||
+            resource.data.shopId == request.auth.uid
+          );
+
+
+        // --------------------------------------------------------
+        // CREATE
+        // --------------------------------------------------------
+        //
+        // Only an APPROVED shop can create an order.
+        //
+        // Required:
+        //   shopId == authenticated UID
+        //   status == pending
+        //
+        allow create:
+          if isAuthenticated()
+          && request.resource.data.shopId == request.auth.uid
+          && request.resource.data.status == 'pending'
+          && isApprovedShop(
+               distributorId,
+               request.auth.uid
+             );
+
+
+        // --------------------------------------------------------
+        // UPDATE
+        // --------------------------------------------------------
+        //
+        // Only distributor can update an order.
+        //
+        // This allows distributor to change:
+        //   pending, confirmed, prepared, delivered, rejected, completed
+        //
+        allow update:
+          if isDistributor(distributorId);
+
+
+        // --------------------------------------------------------
+        // DELETE
+        // --------------------------------------------------------
+        //
+        // Only distributor can delete orders.
+        //
+        allow delete:
+          if isDistributor(distributorId);
+      }
+
+
+      // ==========================================================
+      // BROADCASTS
+      //
+      // /distributor/{distributorId}/broadcasts/{broadcastId}
+      // ==========================================================
+
+      match /broadcasts/{broadcastId} {
+
+        // --------------------------------------------------------
+        // READ
+        // --------------------------------------------------------
+        //
+        // Distributor can read their own broadcasts.
+        // Approved shops belonging to this distributor can read.
+        //
+        allow read:
+          if isDistributor(distributorId)
+          ||
+          (
+            isAuthenticated()
+            && isApprovedShop(
+                 distributorId,
+                 request.auth.uid
+               )
+          );
+
+
+        // --------------------------------------------------------
+        // CREATE
+        // --------------------------------------------------------
+        //
+        // Only distributor can create broadcasts.
+        //
+        allow create:
+          if isDistributor(distributorId);
+
+
+        // --------------------------------------------------------
+        // UPDATE
+        // --------------------------------------------------------
+        //
+        // Only distributor can update broadcasts.
+        //
+        allow update:
+          if isDistributor(distributorId);
+
+
+        // --------------------------------------------------------
+        // DELETE
+        // --------------------------------------------------------
+        //
+        // Only distributor can delete broadcasts.
+        //
+        allow delete:
+          if isDistributor(distributorId);
+      }
+
+
+      // ==========================================================
+      // BROADCAST HISTORY
+      //
+      // /distributor/{distributorId}/broadcast_history/{historyId}
+      // ==========================================================
+
+      match /broadcast_history/{historyId} {
+        allow read, write:
+          if isDistributor(distributorId);
+      }
+    }
+
+
+    // ============================================================
+    // SHOP ACCOUNTS
+    //
+    // /shop_accounts/{shopId}
+    // ============================================================
+
+    match /shop_accounts/{shopId} {
+
+      // ----------------------------------------------------------
+      // READ
+      // ----------------------------------------------------------
+      //
+      // Authenticated users can read.
+      //
+      allow read:
+        if isAuthenticated();
+
+
+      // ----------------------------------------------------------
+      // CREATE
+      // ----------------------------------------------------------
+      //
+      // Shop can create only its own account.
+      //
+      allow create:
+        if isShopOwner(shopId)
+        && request.resource.data.uid == shopId;
+
+
+      // ----------------------------------------------------------
+      // UPDATE
+      // ----------------------------------------------------------
+      //
+      // Distributor can update shop approval information.
+      //
+      // Shop can update its own profile, but cannot change:
+      //   status
+      //   role
+      //   distributorId
+      //   uid
+      //
+      allow update:
+        if isAuthenticated()
+        &&
+        (
+          // Distributor assigned to this shop
+          (
+            request.auth.uid == resource.data.distributorId
+          )
+
+          ||
+
+          // Shop updating its own profile
+          (
+            isShopOwner(shopId)
+            &&
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+              'status',
+              'role',
+              'distributorId',
+              'uid'
+            ])
+          )
+        );
+
+
+      // ----------------------------------------------------------
+      // DELETE
+      // ----------------------------------------------------------
+      //
+      // Only shop can delete its own account.
+      //
+      allow delete:
+        if isShopOwner(shopId);
+    }
+  }
+}
