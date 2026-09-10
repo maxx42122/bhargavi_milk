@@ -7,6 +7,7 @@ import '../../services/auth_service.dart';
 import '../../state/auth_state.dart';
 import '../../state/locale_state.dart';
 import '../../widgets/language_picker.dart';
+import '../../widgets/bvh_logo_widget.dart';
 import '../distributor/distributor_dashboard_screen.dart';
 import '../shop/shop_home_screen.dart';
 import 'distributor_register_screen.dart';
@@ -211,6 +212,7 @@ class _LoginScreenState extends State<LoginScreen> {
     required String status,
   }) async {
     if (!mounted) return;
+    final locale = LocaleScope.of(context);
 
     // ---------------------------------------------------------
     // DISTRIBUTOR
@@ -240,12 +242,12 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (status == 'pending') {
-        await _showPendingDialog();
+        await _showPendingDialog(locale);
         return;
       }
 
       if (status == 'rejected') {
-        await _showRejectedDialog();
+        await _showRejectedDialog(locale);
         return;
       }
 
@@ -260,7 +262,7 @@ class _LoginScreenState extends State<LoginScreen> {
   // PENDING DIALOG
   // ---------------------------------------------------------------------------
 
-  Future<void> _showPendingDialog() async {
+  Future<void> _showPendingDialog(LocaleState locale) async {
     if (!mounted) return;
 
     await showDialog<void>(
@@ -284,11 +286,12 @@ class _LoginScreenState extends State<LoginScreen> {
               size: 32,
             ),
           ),
-          title: const Text('Approval Pending', textAlign: TextAlign.center),
-          content: const Text(
-            'Your shop registration has been sent to the selected distributor.\n\n'
-            'You can login, but you cannot access the shop dashboard until '
-            'the distributor approves your request.',
+          title: Text(
+            locale.t('approval_pending'),
+            textAlign: TextAlign.center,
+          ),
+          content: Text(
+            locale.t('approval_pending_desc'),
             textAlign: TextAlign.center,
           ),
           actionsAlignment: MainAxisAlignment.center,
@@ -297,7 +300,7 @@ class _LoginScreenState extends State<LoginScreen> {
               onPressed: () {
                 Navigator.of(dialogContext).pop();
               },
-              child: const Text('OK'),
+              child: Text(locale.t('ok')),
             ),
           ],
         );
@@ -309,7 +312,7 @@ class _LoginScreenState extends State<LoginScreen> {
   // REJECTED DIALOG
   // ---------------------------------------------------------------------------
 
-  Future<void> _showRejectedDialog() async {
+  Future<void> _showRejectedDialog(LocaleState locale) async {
     if (!mounted) return;
 
     await showDialog<void>(
@@ -333,13 +336,9 @@ class _LoginScreenState extends State<LoginScreen> {
               size: 32,
             ),
           ),
-          title: const Text(
-            'Registration Rejected',
-            textAlign: TextAlign.center,
-          ),
-          content: const Text(
-            'Your shop registration request was rejected by the distributor.\n\n'
-            'Please contact the distributor for more information.',
+          title: Text(locale.t('reg_rejected'), textAlign: TextAlign.center),
+          content: Text(
+            locale.t('reg_rejected_desc'),
             textAlign: TextAlign.center,
           ),
           actionsAlignment: MainAxisAlignment.center,
@@ -348,7 +347,7 @@ class _LoginScreenState extends State<LoginScreen> {
               onPressed: () {
                 Navigator.of(dialogContext).pop();
               },
-              child: const Text('OK'),
+              child: Text(locale.t('ok')),
             ),
           ],
         );
@@ -542,27 +541,32 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildBrandBlock(LocaleState locale, {bool centered = false}) {
     return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: centered
           ? CrossAxisAlignment.center
-          : CrossAxisAlignment.start,
+          : CrossAxisAlignment.end,
       children: [
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 44,
-              height: 44,
+              width: 46,
+              height: 46,
+              padding: const EdgeInsets.all(5),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: Colors.white.withValues(alpha: 0.92),
                 borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              child: const Icon(
-                Icons.water_drop,
-                color: Colors.white,
-                size: 26,
-              ),
+              child: const BvhLogoWidget(size: 36, showCard: false),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Text(
               locale.t('app_name'),
               style: AppTextStyles.h2.copyWith(color: Colors.white),
@@ -590,13 +594,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          value,
-          style: AppTextStyles.h3.copyWith(
-            color: Colors.white,
-            fontFamily: 'Poppins',
-          ),
-        ),
+        Text(value, style: AppTextStyles.h3.copyWith(color: Colors.white)),
         Text(
           label,
           style: AppTextStyles.caption.copyWith(color: Colors.white60),
@@ -649,11 +647,11 @@ class _LoginScreenState extends State<LoginScreen> {
               enabled: !_loading,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return 'Enter email';
+                  return locale.t('enter_email');
                 }
 
                 if (!value.trim().contains('@')) {
-                  return 'Enter a valid email';
+                  return locale.t('enter_valid_email');
                 }
 
                 return null;
@@ -684,7 +682,7 @@ class _LoginScreenState extends State<LoginScreen> {
               },
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Enter password';
+                  return locale.t('enter_password');
                 }
 
                 return null;
@@ -801,7 +799,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Expanded(child: Divider()),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text('or', style: AppTextStyles.caption),
+                    child: Text(locale.t('or'), style: AppTextStyles.caption),
                   ),
                   const Expanded(child: Divider()),
                 ],
@@ -842,7 +840,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        'Continue with Google',
+                        locale.t('continue_with_google'),
                         style: AppTextStyles.bodyBold.copyWith(
                           color: AppColors.ink700,
                         ),

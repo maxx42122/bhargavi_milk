@@ -20,7 +20,7 @@ class AppSearchBar extends StatelessWidget {
       height: 44,
       decoration: BoxDecoration(
         color: AppColors.cardSurface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppColors.innerRadius),
         border: Border.all(color: AppColors.border),
       ),
       child: TextField(

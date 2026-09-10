@@ -171,7 +171,7 @@ class OrderModel {
     final int totalQuantity = (qtyRaw is num)
         ? qtyRaw.toInt()
         : (int.tryParse(qtyRaw?.toString() ?? '0') ??
-            items.fold(0, (sum, i) => sum + i.quantity));
+            items.fold(0, (acc, i) => acc + i.quantity));
 
     DateTime? createdAt;
     if (data['createdAt'] is Timestamp) {
@@ -319,7 +319,7 @@ class OrderService {
     // 3. Subtotal & Total Amount calculation
     final calculatedSubtotal = items.fold<double>(
       0.0,
-      (sum, item) => sum + (item.quantity * item.price),
+      (acc, item) => acc + (item.quantity * item.price),
     );
 
     final finalSubtotal = subtotal ?? calculatedSubtotal;
@@ -343,7 +343,7 @@ class OrderService {
           .map((i) => '${i.productName} × ${i.quantity}')
           .toList();
 
-      final int totalQuantity = items.fold(0, (sum, i) => sum + i.quantity);
+      final int totalQuantity = items.fold(0, (acc, i) => acc + i.quantity);
 
       final orderData = {
         'id': orderId,
@@ -479,6 +479,35 @@ class OrderService {
       'orderStatus': newStatus,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  /// Batch update multiple orders' status (distributor only)
+  static Future<void> batchUpdateOrderStatus({
+    required String distributorId,
+    required List<String> orderIds,
+    required String newStatus,
+  }) async {
+    if (distributorId.isEmpty || orderIds.isEmpty) return;
+
+    final statusLower = newStatus.toLowerCase();
+
+    // Firestore batch limit is 500 operations per batch
+    for (var i = 0; i < orderIds.length; i += 500) {
+      final chunk = orderIds.sublist(
+        i,
+        i + 500 > orderIds.length ? orderIds.length : i + 500,
+      );
+      final batch = _db.batch();
+      for (final orderId in chunk) {
+        final docRef = _ordersRef(distributorId).doc(orderId);
+        batch.update(docRef, {
+          'status': statusLower,
+          'orderStatus': newStatus,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+      await batch.commit();
+    }
   }
 
   /// Delete an order (distributor only)

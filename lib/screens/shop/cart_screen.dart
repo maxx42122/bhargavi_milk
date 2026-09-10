@@ -55,7 +55,7 @@ class CartScreen extends StatelessWidget {
             children: [
               GradientHeader(
                 title: locale.t('cart'),
-                subtitle: '$totalItemCount items in cart',
+                subtitle: '$totalItemCount ${locale.t('items_in_cart')}',
               ),
               if (cartItems.isEmpty)
                 Expanded(
@@ -102,9 +102,8 @@ class CartScreen extends StatelessWidget {
     List<(Product, int)> cartItems,
     double subtotal,
   ) {
-    const deliveryCharge = 20.0;
     const discount = 0.0;
-    final total = subtotal + deliveryCharge - discount;
+    final total = subtotal - discount;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -128,15 +127,12 @@ class CartScreen extends StatelessWidget {
             locale.t('subtotal'),
             '₹${subtotal.toStringAsFixed(subtotal % 1 == 0 ? 0 : 2)}',
           ),
-          _summaryRow(
-            locale.t('delivery_charge'),
-            '₹${deliveryCharge.toStringAsFixed(0)}',
-          ),
-          _summaryRow(
-            locale.t('discount'),
-            '−₹${discount.toStringAsFixed(0)}',
-            color: AppColors.dairyGreen700,
-          ),
+          if (discount > 0)
+            _summaryRow(
+              locale.t('discount'),
+              '−₹${discount.toStringAsFixed(0)}',
+              color: AppColors.dairyGreen700,
+            ),
           const Divider(height: 16),
           _summaryRow(
             locale.t('grand_total'),
@@ -234,9 +230,9 @@ class _CartRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(product.name, style: AppTextStyles.bodyBold),
+                Text(locale.translateProduct(product.name), style: AppTextStyles.bodyBold),
                 Text(
-                  '${product.packSize} • ${product.unit}',
+                  '${product.packSize} • ${locale.translateUnit(product.unit)}',
                   style: AppTextStyles.caption.copyWith(color: AppColors.ink500),
                 ),
                 Text(

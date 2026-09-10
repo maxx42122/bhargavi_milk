@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -62,7 +63,8 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
   List<Product> _filterProducts(List<Product> products) {
     return products.where((p) {
       final q = _search.trim().toLowerCase();
-      final matchSearch = q.isEmpty ||
+      final matchSearch =
+          q.isEmpty ||
           p.name.toLowerCase().contains(q) ||
           p.category.toLowerCase().contains(q) ||
           p.packSize.toLowerCase().contains(q) ||
@@ -109,7 +111,9 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
                 const SizedBox(height: 6),
                 Text(
                   'Please sign in again as a distributor.',
-                  style: AppTextStyles.caption.copyWith(color: AppColors.ink500),
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.ink500,
+                  ),
                 ),
               ],
             ),
@@ -150,11 +154,9 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
                       onPressed: () =>
                           _seedCatalog(context, distributorId, locale),
                     ),
-                  IconButton(
-                    icon: const Icon(Icons.add_circle_outline,
-                        color: Colors.white, size: 24),
+                  _InteractiveHeaderAddBtn(
                     tooltip: locale.t('add_product'),
-                    onPressed: () => _openProductModal(
+                    onTap: () => _openProductModal(
                       context: context,
                       distributorId: distributorId,
                       locale: locale,
@@ -185,7 +187,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
                           return Padding(
                             padding: const EdgeInsets.only(right: 8),
                             child: _FilterChip(
-                              label: cat,
+                              label: locale.translateCategory(cat),
                               active: active,
                               onTap: () =>
                                   setState(() => _categoryFilter = cat),
@@ -205,9 +207,13 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
                         children: _statusOptions.map((st) {
                           final active = _statusFilter == st;
                           Color badgeColor = AppColors.ink500;
-                          if (st == 'Active') badgeColor = AppColors.dairyGreen700;
-                          if (st == 'Inactive') badgeColor = AppColors.red500;
-                          if (st == 'Low Stock') badgeColor = AppColors.amber600;
+                          if (st == 'Active') {
+                            badgeColor = AppColors.dairyGreen700;
+                          } else if (st == 'Inactive') {
+                            badgeColor = AppColors.red500;
+                          } else if (st == 'Low Stock') {
+                            badgeColor = AppColors.amber600;
+                          }
 
                           return Padding(
                             padding: const EdgeInsets.only(right: 8),
@@ -245,8 +251,8 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
                                     ],
                                     Text(
                                       st == 'Low Stock'
-                                          ? 'Low Stock ($lowStockCount)'
-                                          : st,
+                                          ? '${locale.translateStatus(st)} ($lowStockCount)'
+                                          : locale.translateStatus(st),
                                       style: AppTextStyles.captionBold.copyWith(
                                         color: active
                                             ? AppColors.milkBlue700
@@ -330,10 +336,13 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
                               ),
                               const SizedBox(height: 12),
                               OutlinedButton.icon(
-                                onPressed: () =>
-                                    _seedCatalog(context, distributorId, locale),
+                                onPressed: () => _seedCatalog(
+                                  context,
+                                  distributorId,
+                                  locale,
+                                ),
                                 icon: const Icon(Icons.playlist_add),
-                                label: Text(locale.t('seed_products')),
+                                label: Text('Milk'),
                               ),
                             ],
                           ),
@@ -355,7 +364,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
                               ),
                               const SizedBox(height: 10),
                               Text(
-                                'No matching products found',
+                                locale.t('no_matching_products'),
                                 style: AppTextStyles.bodyBold,
                               ),
                               const SizedBox(height: 6),
@@ -367,7 +376,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
                                     _statusFilter = 'All';
                                   });
                                 },
-                                child: const Text('Reset filters'),
+                                child: Text(locale.t('reset_filter')),
                               ),
                             ],
                           ),
@@ -405,21 +414,13 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
               ),
             ],
           ),
-          floatingActionButton: FloatingActionButton.extended(
+          floatingActionButton: _InteractiveAddProductFab(
             onPressed: () => _openProductModal(
               context: context,
               distributorId: distributorId,
               locale: locale,
             ),
-            backgroundColor: AppColors.milkBlue600,
-            icon: const Icon(Icons.add, color: Colors.white),
-            label: Text(
-              locale.t('add_product'),
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            label: locale.t('add_product'),
           ),
         );
       },
@@ -509,7 +510,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
           ],
         ),
         content: Text(
-          'Are you sure you want to remove "${product.name} (${product.packSize})" from your product catalog?',
+          '${locale.t('confirm_delete_product')} (${locale.translateProduct(product.name)} ${product.packSize})',
         ),
         actions: [
           TextButton(
@@ -553,6 +554,410 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
         }
       }
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// INTERACTIVE SHINING ADD PRODUCT BUTTON (FAB)
+// ---------------------------------------------------------------------------
+
+class _InteractiveAddProductFab extends StatefulWidget {
+  final VoidCallback onPressed;
+  final String label;
+
+  const _InteractiveAddProductFab({
+    required this.onPressed,
+    required this.label,
+  });
+
+  @override
+  State<_InteractiveAddProductFab> createState() =>
+      _InteractiveAddProductFabState();
+}
+
+class _InteractiveAddProductFabState extends State<_InteractiveAddProductFab>
+    with TickerProviderStateMixin {
+  late final AnimationController _scaleCtrl;
+  late final Animation<double> _scaleAnimation;
+
+  late final AnimationController _shineCtrl;
+  late final Animation<double> _shineAnimation;
+
+  late final AnimationController _iconCtrl;
+  late final Animation<double> _iconAnimation;
+
+  late final AnimationController _ambientGlowCtrl;
+  late final Animation<double> _ambientGlowAnimation;
+
+  bool _isPressed = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Scale animation on press
+    _scaleCtrl = AnimationController(
+      duration: const Duration(milliseconds: 140),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.92).animate(
+      CurvedAnimation(parent: _scaleCtrl, curve: Curves.easeInOutCubic),
+    );
+
+    // Shine sweep light-beam animation
+    _shineCtrl = AnimationController(
+      duration: const Duration(milliseconds: 850),
+      vsync: this,
+    );
+    _shineAnimation = Tween<double>(
+      begin: -1.2,
+      end: 2.2,
+    ).animate(CurvedAnimation(parent: _shineCtrl, curve: Curves.easeInOutSine));
+
+    // Icon rotation & bounce on touch
+    _iconCtrl = AnimationController(
+      duration: const Duration(milliseconds: 450),
+      vsync: this,
+    );
+    _iconAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _iconCtrl, curve: Curves.elasticOut));
+
+    // Subtle breathing ambient pulse glow
+    _ambientGlowCtrl = AnimationController(
+      duration: const Duration(seconds: 3),
+      vsync: this,
+    )..repeat(reverse: true);
+    _ambientGlowAnimation = Tween<double>(begin: 0.3, end: 0.7).animate(
+      CurvedAnimation(parent: _ambientGlowCtrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _scaleCtrl.dispose();
+    _shineCtrl.dispose();
+    _iconCtrl.dispose();
+    _ambientGlowCtrl.dispose();
+    super.dispose();
+  }
+
+  void _triggerShineAndFeedback() {
+    _shineCtrl.forward(from: 0.0);
+    _iconCtrl.forward(from: 0.0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        _scaleAnimation,
+        _shineAnimation,
+        _iconAnimation,
+        _ambientGlowAnimation,
+      ]),
+      builder: (context, child) {
+        final scale = _scaleAnimation.value;
+        final shineValue = _shineAnimation.value;
+        final isShining = _shineCtrl.isAnimating;
+
+        return Transform.scale(
+          scale: scale,
+          child: GestureDetector(
+            onTapDown: (_) {
+              setState(() => _isPressed = true);
+              _scaleCtrl.forward();
+              _triggerShineAndFeedback();
+            },
+            onTapUp: (_) {
+              setState(() => _isPressed = false);
+              _scaleCtrl.reverse();
+            },
+            onTapCancel: () {
+              setState(() => _isPressed = false);
+              _scaleCtrl.reverse();
+            },
+            onTap: widget.onPressed,
+            child: Container(
+              height: 52,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [
+                    Color(0xFF2979FF), // Vibrant luminous electric blue
+                    Color(0xFF0047FF), // Milk blue 600
+                    Color(0xFF0028B5), // Deep royal navy
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(
+                  color: Colors.white.withValues(
+                    alpha: _isPressed ? 0.75 : 0.4,
+                  ),
+                  width: _isPressed ? 1.8 : 1.2,
+                ),
+                boxShadow: [
+                  // Deep drop shadow
+                  BoxShadow(
+                    color: const Color(0xFF001F6B).withValues(alpha: 0.4),
+                    blurRadius: _isPressed ? 8 : 16,
+                    spreadRadius: _isPressed ? 0 : 2,
+                    offset: Offset(0, _isPressed ? 3 : 8),
+                  ),
+                  // Radiant ambient glow halo
+                  BoxShadow(
+                    color: const Color(0xFF00B0FF).withValues(
+                      alpha: _isPressed
+                          ? 0.8
+                          : _ambientGlowAnimation.value * 0.5,
+                    ),
+                    blurRadius: _isPressed ? 22 : 14,
+                    spreadRadius: _isPressed ? 3 : 1,
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(26),
+                child: Stack(
+                  alignment: Alignment.center,
+                  clipBehavior: Clip.none,
+                  children: [
+                    // BUTTON CONTENT (Icon + Text + Sparkle)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Transform.rotate(
+                          angle: _iconAnimation.value * (math.pi / 2),
+                          child: const Icon(
+                            Icons.add_rounded,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          widget.label,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                            letterSpacing: 0.3,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black26,
+                                offset: Offset(0, 1),
+                                blurRadius: 3,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        AnimatedOpacity(
+                          opacity: isShining || _isPressed ? 1.0 : 0.7,
+                          duration: const Duration(milliseconds: 200),
+                          child: const Icon(
+                            Icons.auto_awesome,
+                            color: Colors.amberAccent,
+                            size: 15,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // SHINING LIGHT BEAM SWEEP OVERLAY
+                    if (isShining || _isPressed)
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: _ShineLightBeamPainter(progress: shineValue),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// SHINE LIGHT BEAM CUSTOM PAINTER
+// ---------------------------------------------------------------------------
+
+class _ShineLightBeamPainter extends CustomPainter {
+  final double progress;
+
+  _ShineLightBeamPainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress < -1.0 || progress > 2.0) return;
+
+    final width = size.width;
+    final height = size.height;
+
+    final paint = Paint()
+      ..shader =
+          LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white.withValues(alpha: 0.0),
+              Colors.white.withValues(alpha: 0.15),
+              Colors.white.withValues(
+                alpha: 0.8,
+              ), // Bright reflective beam center
+              const Color(0xFFB7E2FF).withValues(alpha: 0.9), // Cyan gleam
+              Colors.white.withValues(alpha: 0.15),
+              Colors.white.withValues(alpha: 0.0),
+            ],
+            stops: const [0.0, 0.35, 0.5, 0.55, 0.7, 1.0],
+          ).createShader(
+            Rect.fromLTWH(
+              (progress * width) - (width * 0.4),
+              0,
+              width * 0.8,
+              height,
+            ),
+          );
+
+    // Angled sweep beam path
+    final beamX = progress * (width + height * 0.6) - (height * 0.3);
+    final beamWidth = width * 0.45;
+
+    final path = Path()
+      ..moveTo(beamX - beamWidth, 0)
+      ..lineTo(beamX, 0)
+      ..lineTo(beamX + (height * 0.5), height)
+      ..lineTo(beamX - beamWidth + (height * 0.5), height)
+      ..close();
+
+    canvas.drawPath(path, paint);
+
+    // Sparkle glint star at the crest of the light beam
+    if (progress >= 0.1 && progress <= 0.9) {
+      final sparkleX = (beamX - beamWidth * 0.2 + (height * 0.25)).clamp(
+        10.0,
+        width - 10.0,
+      );
+      final sparkleY = height * 0.3;
+      final sparklePaint = Paint()
+        ..color = Colors.white.withValues(
+          alpha: (1.0 - (progress - 0.5).abs() * 2).clamp(0.0, 1.0) * 0.9,
+        )
+        ..style = PaintingStyle.fill;
+
+      canvas.drawCircle(Offset(sparkleX, sparkleY), 2.5, sparklePaint);
+
+      // 4-point cross glint
+      final crossPaint = Paint()
+        ..color = Colors.white.withValues(
+          alpha: (1.0 - (progress - 0.5).abs() * 2).clamp(0.0, 1.0) * 0.8,
+        )
+        ..strokeWidth = 1.2;
+
+      canvas.drawLine(
+        Offset(sparkleX - 5, sparkleY),
+        Offset(sparkleX + 5, sparkleY),
+        crossPaint,
+      );
+      canvas.drawLine(
+        Offset(sparkleX, sparkleY - 5),
+        Offset(sparkleX, sparkleY + 5),
+        crossPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ShineLightBeamPainter oldDelegate) {
+    return oldDelegate.progress != progress;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// INTERACTIVE HEADER ADD BUTTON
+// ---------------------------------------------------------------------------
+
+class _InteractiveHeaderAddBtn extends StatefulWidget {
+  final VoidCallback onTap;
+  final String tooltip;
+
+  const _InteractiveHeaderAddBtn({required this.onTap, required this.tooltip});
+
+  @override
+  State<_InteractiveHeaderAddBtn> createState() =>
+      _InteractiveHeaderAddBtnState();
+}
+
+class _InteractiveHeaderAddBtnState extends State<_InteractiveHeaderAddBtn>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _scaleAnim;
+  late final Animation<double> _rotationAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      duration: const Duration(milliseconds: 350),
+      vsync: this,
+    );
+    _scaleAnim = Tween<double>(
+      begin: 1.0,
+      end: 0.88,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+    _rotationAnim = Tween<double>(
+      begin: 0.0,
+      end: 0.25,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, _) {
+        return Transform.scale(
+          scale: _scaleAnim.value,
+          child: IconButton(
+            icon: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.4),
+                  width: 1.2,
+                ),
+              ),
+              child: Transform.rotate(
+                angle: _rotationAnim.value * (math.pi * 2),
+                child: const Icon(Icons.add, color: Colors.white, size: 20),
+              ),
+            ),
+            tooltip: widget.tooltip,
+            onPressed: () {
+              _ctrl.forward(from: 0.0).then((_) {
+                if (mounted) _ctrl.reverse();
+              });
+              widget.onTap();
+            },
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -629,8 +1034,8 @@ class _ProductCard extends StatelessWidget {
           color: isOutOfStock
               ? AppColors.red500.withValues(alpha: 0.3)
               : (isLowStock
-                  ? AppColors.amber500.withValues(alpha: 0.3)
-                  : AppColors.border),
+                    ? AppColors.amber500.withValues(alpha: 0.3)
+                    : AppColors.border),
         ),
       ),
       child: Row(
@@ -671,7 +1076,7 @@ class _ProductCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        product.name,
+                        locale.translateProduct(product.name),
                         style: AppTextStyles.bodyBold.copyWith(
                           color: product.active
                               ? AppColors.ink900
@@ -709,7 +1114,7 @@ class _ProductCard extends StatelessWidget {
                 Row(
                   children: [
                     _chip(
-                      product.category,
+                      locale.translateCategory(product.category),
                       AppColors.milkBlue100,
                       AppColors.milkBlue700,
                     ),
@@ -722,7 +1127,7 @@ class _ProductCard extends StatelessWidget {
                     if (product.unit.isNotEmpty && product.unit != 'Pouch') ...[
                       const SizedBox(width: 6),
                       _chip(
-                        product.unit,
+                        locale.translateUnit(product.unit),
                         AppColors.background,
                         AppColors.ink500,
                       ),
@@ -762,14 +1167,14 @@ class _ProductCard extends StatelessWidget {
                             isOutOfStock
                                 ? Icons.cancel_outlined
                                 : (isLowStock
-                                    ? Icons.warning_amber_rounded
-                                    : Icons.check_circle_outline),
+                                      ? Icons.warning_amber_rounded
+                                      : Icons.check_circle_outline),
                             size: 14,
                             color: isOutOfStock
                                 ? AppColors.red500
                                 : (isLowStock
-                                    ? AppColors.amber600
-                                    : AppColors.dairyGreen500),
+                                      ? AppColors.amber600
+                                      : AppColors.dairyGreen500),
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -780,8 +1185,8 @@ class _ProductCard extends StatelessWidget {
                               color: isOutOfStock
                                   ? AppColors.red600
                                   : (isLowStock
-                                      ? AppColors.amber600
-                                      : AppColors.ink500),
+                                        ? AppColors.amber600
+                                        : AppColors.ink500),
                               fontWeight: isLowStock || isOutOfStock
                                   ? FontWeight.w600
                                   : FontWeight.normal,
@@ -1024,7 +1429,9 @@ class _ProductFormModalState extends State<_ProductFormModal> {
     _priceCtrl = TextEditingController(
       text: p != null ? p.price.toStringAsFixed(p.price % 1 == 0 ? 0 : 2) : '',
     );
-    _stockCtrl = TextEditingController(text: p != null ? p.stock.toString() : '100');
+    _stockCtrl = TextEditingController(
+      text: p != null ? p.stock.toString() : '100',
+    );
     _packSizeCtrl = TextEditingController(text: p?.packSize ?? '500ml');
     _descCtrl = TextEditingController(text: p?.description ?? '');
 
@@ -1196,10 +1603,7 @@ class _ProductFormModalState extends State<_ProductFormModal> {
                 // TITLE & CLOSE
                 Row(
                   children: [
-                    Text(
-                      _selectedEmoji,
-                      style: const TextStyle(fontSize: 24),
-                    ),
+                    Text(_selectedEmoji, style: const TextStyle(fontSize: 24)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -1340,7 +1744,9 @@ class _ProductFormModalState extends State<_ProductFormModal> {
                                       .map(
                                         (c) => DropdownMenuItem(
                                           value: c,
-                                          child: Text(c),
+                                          child: Text(
+                                            locale.translateCategory(c),
+                                          ),
                                         ),
                                       )
                                       .toList(),
@@ -1368,7 +1774,7 @@ class _ProductFormModalState extends State<_ProductFormModal> {
                                       .map(
                                         (u) => DropdownMenuItem(
                                           value: u,
-                                          child: Text(u),
+                                          child: Text(locale.translateUnit(u)),
                                         ),
                                       )
                                       .toList(),
@@ -1457,12 +1863,12 @@ class _ProductFormModalState extends State<_ProductFormModal> {
                               Expanded(
                                 child: TextFormField(
                                   controller: _priceCtrl,
-                                  keyboardType: const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                      ),
                                   decoration: InputDecoration(
-                                    labelText:
-                                        '${locale.t("selling_price")} *',
+                                    labelText: '${locale.t("selling_price")} *',
                                     prefixText: '₹ ',
                                   ),
                                   validator: (v) {
@@ -1483,8 +1889,7 @@ class _ProductFormModalState extends State<_ProductFormModal> {
                                   controller: _stockCtrl,
                                   keyboardType: TextInputType.number,
                                   decoration: InputDecoration(
-                                    labelText:
-                                        '${locale.t("stock_qty")} *',
+                                    labelText: '${locale.t("stock_qty")} *',
                                   ),
                                   validator: (v) {
                                     if (v == null || v.trim().isEmpty) {
@@ -1509,7 +1914,8 @@ class _ProductFormModalState extends State<_ProductFormModal> {
                             maxLines: 2,
                             decoration: InputDecoration(
                               labelText: locale.t('description'),
-                              hintText: 'Brief notes about freshness, fat % or storage',
+                              hintText:
+                                  'Brief notes about freshness, fat % or storage',
                             ),
                           ),
 
@@ -1550,8 +1956,7 @@ class _ProductFormModalState extends State<_ProductFormModal> {
                                 Switch(
                                   value: _active,
                                   activeThumbColor: AppColors.dairyGreen500,
-                                  onChanged: (v) =>
-                                      setState(() => _active = v),
+                                  onChanged: (v) => setState(() => _active = v),
                                 ),
                               ],
                             ),
@@ -1582,9 +1987,7 @@ class _ProductFormModalState extends State<_ProductFormModal> {
                                       ),
                                     )
                                   : Text(
-                                      isEditing
-                                          ? locale.t('save')
-                                          : 'Save Product',
+                                      locale.t('save'),
                                       style: AppTextStyles.bodyBold.copyWith(
                                         color: Colors.white,
                                       ),

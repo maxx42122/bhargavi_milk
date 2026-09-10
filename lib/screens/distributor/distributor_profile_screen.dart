@@ -12,15 +12,44 @@ import '../auth/login_screen.dart';
 class DistributorProfileScreen extends StatelessWidget {
   const DistributorProfileScreen({super.key});
 
-  Future<void> _logout(BuildContext context) async {
+  Future<void> _logout(BuildContext context, LocaleState locale) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.logout_rounded, color: AppColors.red500),
+            const SizedBox(width: 8),
+            Text(locale.t('logout')),
+          ],
+        ),
+        content: Text(locale.t('logout_dist_confirm')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(locale.t('cancel')),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.red500,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(locale.t('logout')),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     try {
       // Sign out from Firebase
       await AuthService.signOut();
 
       if (!context.mounted) return;
 
-      // Remove dashboard/profile and all previous screens.
-      // User will not be able to press Back and return to dashboard.
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
         (route) => false,
@@ -30,7 +59,7 @@ class DistributorProfileScreen extends StatelessWidget {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Logout failed. Please try again.'),
+          content: Text('Logout failed: $e'),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
@@ -148,23 +177,23 @@ class DistributorProfileScreen extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
                   children: [
                     // Contact Information
-                    const _SectionLabel('Contact Information'),
+                    _SectionLabel(locale.t('delivery_contact_info')),
 
                     _FieldCard(
                       icon: Icons.email_outlined,
-                      label: 'Email',
+                      label: locale.t('email'),
                       value: email,
                     ),
 
                     _FieldCard(
                       icon: Icons.phone_outlined,
-                      label: 'Mobile',
+                      label: locale.t('phone'),
                       value: mobile,
                     ),
 
                     _FieldCard(
                       icon: Icons.location_on_outlined,
-                      label: 'Address',
+                      label: locale.t('address'),
                       value: address,
                       multiline: true,
                     ),
@@ -172,26 +201,26 @@ class DistributorProfileScreen extends StatelessWidget {
                     const SizedBox(height: 16),
 
                     // Business Details
-                    const _SectionLabel('Business Details'),
+                    _SectionLabel(locale.t('company')),
 
                     _FieldCard(
                       icon: Icons.business_rounded,
-                      label: 'Company Name',
+                      label: locale.t('company'),
                       value: companyName,
                     ),
 
                     _FieldCard(
                       icon: Icons.person_outline,
-                      label: 'Distributor Name',
+                      label: locale.t('contact_person'),
                       value: distributorName,
                     ),
 
                     _FieldCard(
                       icon: Icons.verified_user_outlined,
-                      label: 'Role',
+                      label: locale.t('status'),
                       value: role.isEmpty
-                          ? 'Distributor'
-                          : role[0].toUpperCase() + role.substring(1),
+                          ? locale.t('role_distributor')
+                          : locale.translateStatus(role),
                     ),
 
                     _FieldCard(
@@ -210,7 +239,7 @@ class DistributorProfileScreen extends StatelessWidget {
                       width: double.infinity,
                       height: 50,
                       child: OutlinedButton.icon(
-                        onPressed: () => _logout(context),
+                        onPressed: () => _logout(context, locale),
                         icon: const Icon(
                           Icons.logout,
                           color: AppColors.red600,
@@ -318,11 +347,8 @@ class _ProfileHeader extends StatelessWidget {
             child: Center(
               child: Text(
                 initials,
-                style: const TextStyle(
+                style: AppTextStyles.h2.copyWith(
                   color: Colors.white,
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                  fontFamily: 'Poppins',
                 ),
               ),
             ),

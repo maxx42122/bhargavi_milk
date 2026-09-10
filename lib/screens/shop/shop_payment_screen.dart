@@ -1,13 +1,35 @@
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
+
 import '../../core/colors.dart';
 import '../../core/text_styles.dart';
+import '../../services/order_service.dart';
+import '../../services/payment_service.dart';
+import '../../services/pdf_receipt_service.dart';
+import '../../services/shop_service.dart';
 import '../../state/auth_state.dart';
 import '../../state/locale_state.dart';
 import '../../widgets/app_badge.dart';
 import '../../widgets/gradient_header.dart';
 
 class ShopPaymentScreen extends StatefulWidget {
-  const ShopPaymentScreen({super.key});
+  final OrderModel? order;
+  final double? amountDue;
+  final String? distributorId;
+  final String? distributorName;
+  final String? invoiceId;
+
+  const ShopPaymentScreen({
+    super.key,
+    this.order,
+    this.amountDue,
+    this.distributorId,
+    this.distributorName,
+    this.invoiceId,
+  });
 
   @override
   State<ShopPaymentScreen> createState() => _ShopPaymentScreenState();
@@ -15,7 +37,26 @@ class ShopPaymentScreen extends StatefulWidget {
 
 class _ShopPaymentScreenState extends State<ShopPaymentScreen> {
   String _paymentMethod = 'upi';
+  bool _isProcessing = false;
   bool _paid = false;
+
+  late final Razorpay _razorpay;
+  String? _lastTransactionId;
+  OrderModel? _lastPaidOrder;
+  double _lastPaidAmount = 0.0;
+  double _lastRemainingBalance = 0.0;
+
+  // Selected order to pay if multiple pending orders exist
+  String _selectedOrderId = 'ALL';
+
+  // Active transaction temporary memory for Razorpay SDK callback
+  List<String> _pendingOrderIds = [];
+  List<String> _pendingOrderNumbers = [];
+  double _pendingAmount = 0.0;
+  double _pendingRemaining = 0.0;
+  OrderModel? _pendingOrder;
+
+  Map<String, String>? _distributorInfo;
 
   static const _methods = [
     ('upi', Icons.qr_code_2, 'pay_upi'),
@@ -25,33 +66,154 @@ class _ShopPaymentScreenState extends State<ShopPaymentScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handleRazorpaySuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handleRazorpayError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+
+    _loadDistributorDetails();
+  }
+
+  @override
+  void dispose() {
+    _razorpay.clear();
+    super.dispose();
+  }
+
+  Future<void> _loadDistributorDetails() async {
+    final distId = widget.distributorId ??
+        widget.order?.distributorId ??
+        '';
+    if (distId.isNotEmpty) {
+      final info = await ShopService.fetchDistributorInfo(distId);
+      if (mounted) setState(() => _distributorInfo = info);
+    }
+  }
+
+  String _resolveDistributorId(BuildContext context) {
+    if (widget.distributorId != null && widget.distributorId!.isNotEmpty) {
+      return widget.distributorId!;
+    }
+    if (widget.order != null && widget.order!.distributorId.isNotEmpty) {
+      return widget.order!.distributorId;
+    }
+    try {
+      final auth = AuthStateScope.of(context);
+      if (auth.distributorId != null && auth.distributorId!.isNotEmpty) {
+        return auth.distributorId!;
+      }
+      if (auth.shopProfile?.distributorId.isNotEmpty == true) {
+        return auth.shopProfile!.distributorId;
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  String _resolveShopUid() {
+    return FirebaseAuth.instance.currentUser?.uid ?? '';
+  }
+
+  @override
   Widget build(BuildContext context) {
     final locale = LocaleScope.of(context);
+    final distributorId = _resolveDistributorId(context);
+    final shopUid = _resolveShopUid();
+
+    final inv = widget.order?.orderNumber ??
+        widget.invoiceId ??
+        (widget.amountDue != null ? 'Pending Balance' : '#DUE-SETTLEMENT');
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
         children: [
           GradientHeader(
             title: locale.t('nav_payments'),
-            subtitle: 'Invoice #INV-1042',
+            subtitle: '${locale.t("invoice_no")} $inv',
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
           ),
           Expanded(
             child: _paid
                 ? _buildSuccessView(context, locale)
-                : _buildPaymentView(context, locale),
+                : StreamBuilder<List<OrderModel>>(
+                    stream: OrderService.streamShopOrders(
+                      distributorId: distributorId,
+                      shopUid: shopUid,
+                    ),
+                    builder: (context, ordersSnap) {
+                      final allShopOrders = ordersSnap.data ?? [];
+                      final pendingOrders = allShopOrders
+                          .where((o) =>
+                              o.paymentStatus.toLowerCase() == 'pending')
+                          .toList();
+
+                      return _buildPaymentView(
+                        context: context,
+                        locale: locale,
+                        distributorId: distributorId,
+                        shopUid: shopUid,
+                        pendingOrders: pendingOrders,
+                      );
+                    },
+                  ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPaymentView(BuildContext context, LocaleState locale) {
+  Widget _buildPaymentView({
+    required BuildContext context,
+    required LocaleState locale,
+    required String distributorId,
+    required String shopUid,
+    required List<OrderModel> pendingOrders,
+  }) {
     final auth = AuthStateScope.of(context);
+    final profile = auth.shopProfile;
+
+    // Calculate pending dues
+    final double totalPendingDues = pendingOrders.fold<double>(
+      0.0,
+      (sum, o) => sum + o.totalAmount,
+    );
+
+    double payableAmount = 0.0;
+    OrderModel? targetOrder = widget.order;
+
+    if (widget.order != null) {
+      payableAmount = widget.order!.totalAmount;
+      targetOrder = widget.order;
+    } else if (widget.amountDue != null && widget.amountDue! > 0) {
+      payableAmount = widget.amountDue!;
+    } else if (_selectedOrderId != 'ALL') {
+      final match = pendingOrders.where((o) => o.id == _selectedOrderId).firstOrNull;
+      if (match != null) {
+        payableAmount = match.totalAmount;
+        targetOrder = match;
+      } else {
+        payableAmount = totalPendingDues;
+      }
+    } else {
+      payableAmount = totalPendingDues > 0
+          ? totalPendingDues
+          : (profile?.outstanding ?? 0.0);
+    }
+
+    final numberFormat = NumberFormat('#,##,##0', 'en_IN');
+    final formattedPayable = '₹${numberFormat.format(payableAmount)}';
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Invoice info card
+          // Invoice / Dues info card
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -61,6 +223,13 @@ class _ShopPaymentScreenState extends State<ShopPaymentScreen> {
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.milkBlue700.withValues(alpha: 0.25),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
             child: Column(
               children: [
@@ -73,11 +242,15 @@ class _ShopPaymentScreenState extends State<ShopPaymentScreen> {
                           Text(
                             locale.t('invoice_no'),
                             style: AppTextStyles.overline.copyWith(
-                              color: Colors.white60,
+                              color: Colors.white70,
                             ),
                           ),
                           Text(
-                            '#INV-1042',
+                            targetOrder?.orderNumber ??
+                                widget.invoiceId ??
+                                (pendingOrders.isNotEmpty
+                                    ? '${pendingOrders.length} Unpaid Orders'
+                                    : '#SETTLEMENT'),
                             style: AppTextStyles.h4.copyWith(
                               color: Colors.white,
                             ),
@@ -88,7 +261,7 @@ class _ShopPaymentScreenState extends State<ShopPaymentScreen> {
                     AppBadge(
                       label: locale.t('pay_pending'),
                       variant: BadgeVariant.error,
-                      showDot: false,
+                      showDot: true,
                     ),
                   ],
                 ),
@@ -97,19 +270,19 @@ class _ShopPaymentScreenState extends State<ShopPaymentScreen> {
                   children: [
                     _invoiceCell(
                       locale.t('amount_due'),
-                      '₹${(auth.shopProfile?.outstanding ?? 0).toStringAsFixed(0)}',
+                      formattedPayable,
                       Colors.white70,
                       Colors.white,
                     ),
                     _invoiceCell(
                       locale.t('prev_outstanding'),
-                      '₹${(auth.shopProfile?.outstanding ?? 0).toStringAsFixed(0)}',
+                      '₹${numberFormat.format(totalPendingDues > 0 ? totalPendingDues : (profile?.outstanding ?? 0.0))}',
                       Colors.white70,
                       Colors.white,
                     ),
                     _invoiceCell(
                       locale.t('total_payable'),
-                      '₹${(auth.shopProfile?.outstanding ?? 0).toStringAsFixed(0)}',
+                      formattedPayable,
                       Colors.white70,
                       Colors.white,
                     ),
@@ -118,7 +291,61 @@ class _ShopPaymentScreenState extends State<ShopPaymentScreen> {
               ],
             ),
           ),
+
+          // Multiple pending orders selector (if no specific order was passed)
+          if (widget.order == null && pendingOrders.length > 1) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.cardSurface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Select Pending Order to Pay',
+                    style: AppTextStyles.bodyBold,
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: _selectedOrderId,
+                    decoration: const InputDecoration(
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      DropdownMenuItem(
+                        value: 'ALL',
+                        child: Text(
+                          'Pay All Unpaid Orders (₹${numberFormat.format(totalPendingDues)})',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      ...pendingOrders.map(
+                        (o) => DropdownMenuItem(
+                          value: o.id,
+                          child: Text(
+                            '${o.orderNumber} - ₹${numberFormat.format(o.totalAmount)} (${o.items.length} items)',
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() => _selectedOrderId = val);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           const SizedBox(height: 16),
+
           // Payment method selection
           Container(
             padding: const EdgeInsets.all(16),
@@ -183,19 +410,48 @@ class _ShopPaymentScreenState extends State<ShopPaymentScreen> {
               ],
             ),
           ),
+
           const SizedBox(height: 20),
+
+          // Action Button
           SizedBox(
             width: double.infinity,
-            height: 50,
+            height: 52,
             child: ElevatedButton(
-              onPressed: () => setState(() => _paid = true),
+              onPressed: _isProcessing || payableAmount <= 0
+                  ? null
+                  : () => _initiatePayment(
+                        context: context,
+                        distributorId: distributorId,
+                        shopUid: shopUid,
+                        payableAmount: payableAmount,
+                        pendingOrders: pendingOrders,
+                        targetOrder: targetOrder,
+                      ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.dairyGreen500,
+                backgroundColor: AppColors.dairyGreen600,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
-              child: Text(
-                '${locale.t('confirm')} ₹1,200',
-                style: const TextStyle(color: Colors.white, fontSize: 16),
-              ),
+              child: _isProcessing
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                  : Text(
+                      '${locale.t('confirm')} $formattedPayable',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
             ),
           ),
         ],
@@ -203,15 +459,233 @@ class _ShopPaymentScreenState extends State<ShopPaymentScreen> {
     );
   }
 
+  Future<void> _initiatePayment({
+    required BuildContext context,
+    required String distributorId,
+    required String shopUid,
+    required double payableAmount,
+    required List<OrderModel> pendingOrders,
+    OrderModel? targetOrder,
+  }) async {
+    if (distributorId.isEmpty || shopUid.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Account error: Distributor ID or Shop ID missing.'),
+          backgroundColor: AppColors.red500,
+        ),
+      );
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    final auth = AuthStateScope.of(context);
+    final shopProfile = auth.shopProfile;
+
+    setState(() => _isProcessing = true);
+
+    try {
+      // Determine order IDs to settle
+      List<String> orderIdsToSettle = [];
+      List<String> orderNumbersToSettle = [];
+
+      if (targetOrder != null) {
+        orderIdsToSettle = [targetOrder.id];
+        orderNumbersToSettle = [targetOrder.orderNumber];
+      } else if (_selectedOrderId != 'ALL') {
+        final match = pendingOrders.where((o) => o.id == _selectedOrderId).firstOrNull;
+        if (match != null) {
+          orderIdsToSettle = [match.id];
+          orderNumbersToSettle = [match.orderNumber];
+          targetOrder = match;
+        }
+      } else {
+        orderIdsToSettle = pendingOrders.map((o) => o.id).toList();
+        orderNumbersToSettle = pendingOrders.map((o) => o.orderNumber).toList();
+        if (pendingOrders.isNotEmpty) {
+          targetOrder = pendingOrders.first;
+        }
+      }
+
+      final updatedTotalPending = (pendingOrders.fold<double>(0.0, (s, o) => s + o.totalAmount) - payableAmount).clamp(0.0, double.infinity);
+
+      // 1. UPI / Razorpay Online Flow
+      if (_paymentMethod == 'upi') {
+        _pendingOrderIds = orderIdsToSettle;
+        _pendingOrderNumbers = orderNumbersToSettle;
+        _pendingAmount = payableAmount;
+        _pendingRemaining = updatedTotalPending;
+        _pendingOrder = targetOrder;
+
+        final amountInPaise = (payableAmount * 100).round();
+        final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
+        final callable = functions.httpsCallable('createRazorpayOrder');
+
+        final result = await callable.call({'amount': amountInPaise});
+        final data = Map<String, dynamic>.from(result.data as Map);
+
+        if (data['success'] != true) {
+          throw Exception('Unable to create Razorpay payment order.');
+        }
+
+        final razorpayOrderId = data['orderId']?.toString();
+        final razorpayKeyId = data['keyId']?.toString();
+        final returnedAmount = data['amount'];
+
+        final options = {
+          'key': razorpayKeyId,
+          'amount': returnedAmount,
+          'currency': 'INR',
+          'name': 'Bhargavi Milk',
+          'description': 'Milk Dues Payment',
+          'order_id': razorpayOrderId,
+          'timeout': 300,
+          'prefill': {
+            'contact': shopProfile?.mobile ?? '',
+            'name': shopProfile?.ownerName.isNotEmpty == true
+                ? shopProfile!.ownerName
+                : (shopProfile?.shopName ?? 'Shop'),
+          },
+          'theme': {'color': '#0047FF'},
+        };
+
+        // Open Razorpay Sheet
+        _razorpay.open(options);
+        return;
+      }
+
+      // 2. Offline / Cash / Bank / Credit Direct Settlement Flow
+      final txnId = await PaymentService.recordPayment(
+        distributorId: distributorId,
+        shopId: shopUid,
+        shopName: shopProfile?.shopName ?? 'My Dairy Shop',
+        shopOwner: shopProfile?.ownerName ?? '',
+        shopMobile: shopProfile?.mobile ?? '',
+        orderIds: orderIdsToSettle,
+        orderNumbers: orderNumbersToSettle,
+        amount: payableAmount,
+        paymentMethod: _paymentMethod,
+        paymentStatus: 'Paid',
+      );
+
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _paid = true;
+          _lastTransactionId = txnId;
+          _lastPaidAmount = payableAmount;
+          _lastRemainingBalance = updatedTotalPending;
+          _lastPaidOrder = targetOrder;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Payment failed: $e'),
+            backgroundColor: AppColors.red500,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleRazorpaySuccess(PaymentSuccessResponse response) async {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final auth = AuthStateScope.of(context);
+    final shopProfile = auth.shopProfile;
+    final distributorId = _resolveDistributorId(context);
+    final shopUid = _resolveShopUid();
+
+    final orderIds = _pendingOrderIds.isNotEmpty
+        ? _pendingOrderIds
+        : (widget.order != null ? [widget.order!.id] : <String>[]);
+    final orderNumbers = _pendingOrderNumbers.isNotEmpty
+        ? _pendingOrderNumbers
+        : (widget.order != null ? [widget.order!.orderNumber] : <String>[]);
+    final amount = _pendingAmount > 0
+        ? _pendingAmount
+        : (widget.amountDue ?? widget.order?.totalAmount ?? 0.0);
+    final remaining = _pendingRemaining;
+    final paidOrder = _pendingOrder ?? widget.order;
+
+    try {
+      final txnId = await PaymentService.recordPayment(
+        distributorId: distributorId,
+        shopId: shopUid,
+        shopName: shopProfile?.shopName ?? 'My Dairy Shop',
+        shopOwner: shopProfile?.ownerName ?? '',
+        shopMobile: shopProfile?.mobile ?? '',
+        orderIds: orderIds,
+        orderNumbers: orderNumbers,
+        amount: amount,
+        paymentMethod: 'upi',
+        paymentStatus: 'Paid',
+        transactionId: response.paymentId,
+        razorpayPaymentId: response.paymentId,
+        razorpayOrderId: response.orderId,
+        razorpaySignature: response.signature,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _paid = true;
+          _lastTransactionId = txnId;
+          _lastPaidAmount = amount;
+          _lastRemainingBalance = remaining;
+          _lastPaidOrder = paidOrder;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Payment succeeded but saving failed: $e'),
+            backgroundColor: AppColors.red500,
+          ),
+        );
+      }
+    }
+  }
+
+  void _handleRazorpayError(PaymentFailureResponse response) {
+    if (mounted) {
+      setState(() => _isProcessing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Payment failed: ${response.message ?? "Cancelled"}'),
+          backgroundColor: AppColors.red500,
+        ),
+      );
+    }
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Wallet: ${response.walletName ?? "Selected"}')),
+      );
+    }
+  }
+
   Widget _buildSuccessView(BuildContext context, LocaleState locale) {
-    return Padding(
-      padding: const EdgeInsets.all(32),
+    final numberFormat = NumberFormat('#,##,##0', 'en_IN');
+    final formattedPaid = '₹${numberFormat.format(_lastPaidAmount)}';
+    final formattedBalance = '₹${numberFormat.format(_lastRemainingBalance)}';
+    final txn = _lastTransactionId ?? 'TXN${DateTime.now().millisecondsSinceEpoch.toString().substring(4)}';
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          const SizedBox(height: 16),
           Container(
-            width: 90,
-            height: 90,
+            width: 84,
+            height: 84,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [AppColors.dairyGreen500, AppColors.dairyGreen700],
@@ -219,7 +693,7 @@ class _ShopPaymentScreenState extends State<ShopPaymentScreen> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.dairyGreen500.withValues(alpha: 0.3),
+                  color: AppColors.dairyGreen500.withValues(alpha: 0.35),
                   blurRadius: 24,
                   offset: const Offset(0, 8),
                 ),
@@ -228,52 +702,87 @@ class _ShopPaymentScreenState extends State<ShopPaymentScreen> {
             child: const Icon(
               Icons.check_rounded,
               color: Colors.white,
-              size: 48,
+              size: 44,
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           Text(
             locale.t('payment_success'),
             style: AppTextStyles.h3.copyWith(color: AppColors.dairyGreen700),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
-            'Your payment has been processed successfully',
+            locale.t('payment_processed_success'),
             style: AppTextStyles.body,
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.dairyGreen100,
+              color: AppColors.dairyGreen100.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.dairyGreen300),
             ),
             child: Column(
               children: [
-                _detailRow(locale.t('transaction_id'), 'TXN9876543'),
-                const SizedBox(height: 8),
+                _detailRow(locale.t('transaction_id'), txn),
+                const Divider(height: 16),
                 _detailRow(
                   locale.t('amount_paid'),
-                  '₹1,200',
+                  formattedPaid,
                   valueColor: AppColors.dairyGreen700,
                 ),
-                const SizedBox(height: 8),
+                const Divider(height: 16),
                 _detailRow(
                   locale.t('remaining_balance'),
-                  '₹2,240',
-                  valueColor: AppColors.amber600,
+                  formattedBalance,
+                  valueColor: _lastRemainingBalance > 0
+                      ? AppColors.amber700
+                      : AppColors.dairyGreen700,
                 ),
               ],
             ),
           ),
           const SizedBox(height: 24),
+
+          // Receipt Actions
           Row(
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.remove_red_eye_outlined, size: 18),
+                  onPressed: () {
+                    final orderToPrint = _lastPaidOrder ??
+                        OrderModel(
+                          id: txn,
+                          orderNumber: '#$txn',
+                          shopId: _resolveShopUid(),
+                          shopName: AuthStateScope.of(context).shopProfile?.shopName ?? 'My Shop',
+                          distributorId: _resolveDistributorId(context),
+                          items: const [],
+                          products: ['Settlement Payment ($formattedPaid)'],
+                          totalQuantity: 1,
+                          subtotal: _lastPaidAmount,
+                          deliveryCharge: 0.0,
+                          discount: 0.0,
+                          totalAmount: _lastPaidAmount,
+                          status: 'completed',
+                          deliveryAddress: AuthStateScope.of(context).shopProfile?.address ?? '',
+                          deliveryDate: 'Today',
+                          deliveryTime: 'Immediate',
+                          paymentMethod: _paymentMethod,
+                          paymentStatus: 'Paid',
+                          createdAt: DateTime.now(),
+                        );
+
+                    PdfReceiptService.previewReceipt(
+                      context: context,
+                      order: orderToPrint,
+                      distributorInfo: _distributorInfo,
+                      transactionId: txn,
+                    );
+                  },
+                  icon: const Icon(Icons.receipt_long_outlined, size: 18),
                   label: Text(locale.t('view_receipt')),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.milkBlue600,
@@ -288,10 +797,41 @@ class _ShopPaymentScreenState extends State<ShopPaymentScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.download_outlined, size: 18),
-                  label: Text(locale.t('download_receipt')),
+                  onPressed: () {
+                    final orderToPrint = _lastPaidOrder ??
+                        OrderModel(
+                          id: txn,
+                          orderNumber: '#$txn',
+                          shopId: _resolveShopUid(),
+                          shopName: AuthStateScope.of(context).shopProfile?.shopName ?? 'My Shop',
+                          distributorId: _resolveDistributorId(context),
+                          items: const [],
+                          products: ['Settlement Payment ($formattedPaid)'],
+                          totalQuantity: 1,
+                          subtotal: _lastPaidAmount,
+                          deliveryCharge: 0.0,
+                          discount: 0.0,
+                          totalAmount: _lastPaidAmount,
+                          status: 'completed',
+                          deliveryAddress: AuthStateScope.of(context).shopProfile?.address ?? '',
+                          deliveryDate: 'Today',
+                          deliveryTime: 'Immediate',
+                          paymentMethod: _paymentMethod,
+                          paymentStatus: 'Paid',
+                          createdAt: DateTime.now(),
+                        );
+
+                    PdfReceiptService.printReceipt(
+                      order: orderToPrint,
+                      distributorInfo: _distributorInfo,
+                      transactionId: txn,
+                    );
+                  },
+                  icon: const Icon(Icons.print_outlined, size: 18),
+                  label: Text(locale.t('print')),
                   style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.milkBlue600,
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 13),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -301,10 +841,12 @@ class _ShopPaymentScreenState extends State<ShopPaymentScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+
+          const SizedBox(height: 16),
+
           TextButton(
-            onPressed: () => setState(() => _paid = false),
-            child: const Text('Make Another Payment'),
+            onPressed: () => Navigator.pop(context),
+            child: Text(locale.t('back')),
           ),
         ],
       ),
@@ -324,6 +866,7 @@ class _ShopPaymentScreenState extends State<ShopPaymentScreen> {
             value,
             style: AppTextStyles.bodyBold.copyWith(color: valueColor),
           ),
+          const SizedBox(height: 2),
           Text(
             label,
             style: AppTextStyles.overline.copyWith(color: labelColor),

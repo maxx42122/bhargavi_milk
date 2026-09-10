@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/colors.dart';
 import '../../core/text_styles.dart';
 import '../../state/locale_state.dart';
+import '../../widgets/bvh_logo_widget.dart';
 
 class InvoiceScreen extends StatelessWidget {
   final bool embedded;
@@ -99,18 +100,19 @@ class InvoiceScreen extends StatelessWidget {
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(6),
+                            width: 34,
+                            height: 34,
+                            padding: const EdgeInsets.all(3),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
+                              color: Colors.white.withValues(alpha: 0.95),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Icon(
-                              Icons.water_drop,
-                              color: Colors.white,
-                              size: 18,
+                            child: const BvhLogoWidget(
+                              size: 28,
+                              showCard: false,
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 10),
                           Text(
                             'Bhargavi Distributors',
                             style: AppTextStyles.h4.copyWith(
@@ -157,7 +159,7 @@ class InvoiceScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '23 Aug 2026',
+                      locale.translateDate('23 Aug 2026'),
                       style: AppTextStyles.caption.copyWith(
                         color: Colors.white70,
                       ),
@@ -174,7 +176,7 @@ class InvoiceScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'BILL TO',
+                  locale.t('bill_to'),
                   style: AppTextStyles.overline.copyWith(
                     color: AppColors.milkBlue700,
                   ),
@@ -206,7 +208,7 @@ class InvoiceScreen extends StatelessWidget {
                 Expanded(
                   flex: 1,
                   child: Text(
-                    'QTY',
+                    locale.t('qty').toUpperCase(),
                     style: AppTextStyles.overline,
                     textAlign: TextAlign.center,
                   ),
@@ -242,7 +244,7 @@ class InvoiceScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(item.name, style: AppTextStyles.body),
+                        Text(locale.translateProduct(item.name), style: AppTextStyles.body),
                         Text(item.packSize, style: AppTextStyles.caption),
                       ],
                     ),

@@ -9,6 +9,7 @@ import '../../widgets/app_badge.dart';
 import '../../widgets/app_search_bar.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/gradient_header.dart';
+import 'total_orders_summary_screen.dart';
 
 class OrderManagementScreen extends StatefulWidget {
   const OrderManagementScreen({super.key});
@@ -19,7 +20,15 @@ class OrderManagementScreen extends StatefulWidget {
 
 class _OrderManagementScreenState extends State<OrderManagementScreen> {
   String _search = '';
+  String _dateFilter = 'Today'; // Default is strictly Today!
   String _statusFilter = 'All';
+
+  final _dateFilters = [
+    'Today',
+    'Yesterday',
+    'This Week',
+    'All Orders',
+  ];
 
   final _statuses = [
     'All',
@@ -31,9 +40,35 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
     'rejected',
   ];
 
-  String _formatStatusLabel(String s) {
-    if (s == 'All') return 'All';
-    return s[0].toUpperCase() + s.substring(1);
+  bool _isOrderInDateFilter(OrderModel order) {
+    final dt = order.createdAt ?? DateTime.now();
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+    switch (_dateFilter) {
+      case 'Today':
+        return dt.isAfter(todayStart.subtract(const Duration(seconds: 1))) &&
+            dt.isBefore(todayEnd.add(const Duration(seconds: 1)));
+      case 'Yesterday':
+        final yestStart = todayStart.subtract(const Duration(days: 1));
+        final yestEnd = DateTime(
+          yestStart.year,
+          yestStart.month,
+          yestStart.day,
+          23,
+          59,
+          59,
+        );
+        return dt.isAfter(yestStart.subtract(const Duration(seconds: 1))) &&
+            dt.isBefore(yestEnd.add(const Duration(seconds: 1)));
+      case 'This Week':
+        final weekStart = todayStart.subtract(Duration(days: now.weekday - 1));
+        return dt.isAfter(weekStart.subtract(const Duration(seconds: 1)));
+      case 'All Orders':
+      default:
+        return true;
+    }
   }
 
   String _formatDate(DateTime? dt) {
@@ -61,49 +96,255 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
       body: Column(
         children: [
           GradientHeader(
-            title: locale.t('nav_orders'),
-            subtitle: 'Distributor Orders Management',
+            title: _dateFilter == 'Today'
+                ? locale.t('today_orders')
+                : locale.t('nav_orders'),
+            subtitle: _dateFilter == 'Today'
+                ? 'Showing all orders received today'
+                : locale.t('dist_orders_mgmt'),
+            actions: [
+              FilledButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => TotalOrdersSummaryScreen(
+                        initialDistributorId: distributorId,
+                        initialDateFilter: _dateFilter,
+                      ),
+                    ),
+                  );
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppColors.milkBlue800,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  visualDensity: VisualDensity.compact,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                icon: const Icon(
+                  Icons.analytics_rounded,
+                  size: 16,
+                  color: AppColors.milkBlue700,
+                ),
+                label: Text(
+                  _dateFilter == 'Today'
+                      ? locale.t('total_today_orders')
+                      : locale.t('total_orders'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                    color: AppColors.milkBlue900,
+                  ),
+                ),
+              ),
+            ],
           ),
+
+          // ── Quick Summary Action Banner ──────────────────────────────────
+          GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => TotalOrdersSummaryScreen(
+                    initialDistributorId: distributorId,
+                    initialDateFilter: _dateFilter,
+                  ),
+                ),
+              );
+            },
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.milkBlue800, AppColors.milkBlue600],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.milkBlue700.withValues(alpha: 0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.checklist_rtl_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _dateFilter == 'Today'
+                              ? 'Today Customer Checklist & Totals'
+                              : 'Total Orders & Brand Summary',
+                          style: AppTextStyles.captionBold.copyWith(
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'View customer-wise list, checklist & download PDF',
+                          style: AppTextStyles.overline.copyWith(
+                            color: Colors.white70,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          locale.t('view_total_orders'),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                            color: AppColors.milkBlue800,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 10,
+                          color: AppColors.milkBlue800,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Column(
               children: [
+                // Date Filter Selector (Today by default!)
+                SizedBox(
+                  height: 32,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: _dateFilters.map((df) {
+                      final active = _dateFilter == df;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: GestureDetector(
+                          onTap: () => setState(() => _dateFilter = df),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: active
+                                  ? AppColors.milkBlue700
+                                  : AppColors.cardSurface,
+                              borderRadius: BorderRadius.circular(100),
+                              border: Border.all(
+                                color: active
+                                    ? AppColors.milkBlue700
+                                    : AppColors.border,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (df == 'Today') ...[
+                                  Icon(
+                                    Icons.today_rounded,
+                                    size: 13,
+                                    color: active ? Colors.white : AppColors.milkBlue700,
+                                  ),
+                                  const SizedBox(width: 4),
+                                ],
+                                Text(
+                                  df == 'Today' ? locale.t('today_orders') : df,
+                                  style: TextStyle(
+                                    color: active ? Colors.white : AppColors.ink700,
+                                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                                    fontSize: 11.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
                 AppSearchBar(
-                  hint: '${locale.t("search")} orders…',
+                  hint: '${locale.t("search")} orders, shop, items…',
                   onChanged: (v) => setState(() => _search = v),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
+
+                // Status Filter
                 SizedBox(
-                  height: 36,
+                  height: 32,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     children: _statuses.map((s) {
                       final active = _statusFilter == s;
                       return Padding(
-                        padding: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.only(right: 6),
                         child: GestureDetector(
                           onTap: () => setState(() => _statusFilter = s),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
+                              horizontal: 12,
+                              vertical: 6,
                             ),
                             decoration: BoxDecoration(
                               color: active
-                                  ? AppColors.milkBlue600
+                                  ? AppColors.dairyGreen600
                                   : AppColors.cardSurface,
                               borderRadius: BorderRadius.circular(100),
                               border: Border.all(
                                 color: active
-                                    ? AppColors.milkBlue600
+                                    ? AppColors.dairyGreen600
                                     : AppColors.border,
                               ),
                             ),
                             child: Text(
-                              _formatStatusLabel(s),
-                              style: AppTextStyles.captionBold.copyWith(
+                              locale.translateStatus(s),
+                              style: TextStyle(
                                 color: active ? Colors.white : AppColors.ink700,
+                                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                                fontSize: 11,
                               ),
                             ),
                           ),
@@ -135,11 +376,16 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                       }
 
                       final allOrders = snapshot.data ?? [];
-                      final filtered = allOrders.where((o) {
+                      // Filter by Date (Today by default)
+                      final dateFiltered = allOrders.where(_isOrderInDateFilter).toList();
+
+                      final filtered = dateFiltered.where((o) {
                         if (_search.isEmpty) return true;
                         final q = _search.toLowerCase();
                         final matchesShop =
                             o.shopName.toLowerCase().contains(q);
+                        final matchesOwner =
+                            o.shopOwner.toLowerCase().contains(q);
                         final matchesNum =
                             o.orderNumber.toLowerCase().contains(q);
                         final matchesId = o.id.toLowerCase().contains(q);
@@ -147,6 +393,7 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                           (p) => p.toLowerCase().contains(q),
                         );
                         return matchesShop ||
+                            matchesOwner ||
                             matchesNum ||
                             matchesId ||
                             matchesProducts;
@@ -156,14 +403,14 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
                         return EmptyState(
                           icon: Icons.receipt_long_outlined,
                           title: locale.t('no_data'),
-                          subtitle: _statusFilter == 'All'
-                              ? 'No orders placed yet.'
-                              : 'No $_statusFilter orders found.',
+                          subtitle: _dateFilter == 'Today'
+                              ? 'No orders placed today yet.'
+                              : 'No orders found for the selected filter.',
                         );
                       }
 
                       return ListView.separated(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 95),
                         itemCount: filtered.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 10),
                         itemBuilder: (_, i) => _OrderCard(
@@ -178,6 +425,149 @@ class _OrderManagementScreenState extends State<OrderManagementScreen> {
           ),
         ],
       ),
+
+      // ── Fixed Bottom Button: Total Today's Orders & Checklist ────────────────
+      bottomSheet: distributorId.isEmpty
+          ? null
+          : StreamBuilder<List<OrderModel>>(
+              stream: OrderService.streamDistributorOrders(
+                distributorId: distributorId,
+                statusFilter: _statusFilter,
+              ),
+              builder: (context, snapshot) {
+                final allOrders = snapshot.data ?? [];
+                final dateFiltered =
+                    allOrders.where(_isOrderInDateFilter).toList();
+                final totalOrdersCount = dateFiltered.length;
+                final totalQty = dateFiltered.fold(
+                  0,
+                  (sum, o) => sum + o.totalQuantity,
+                );
+                final totalRupees = dateFiltered.fold(
+                  0.0,
+                  (sum, o) => sum + o.totalAmount,
+                );
+
+                if (dateFiltered.isEmpty) return const SizedBox.shrink();
+
+                return Container(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.cardSurface,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 10,
+                        offset: const Offset(0, -4),
+                      ),
+                    ],
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => TotalOrdersSummaryScreen(
+                                initialDistributorId: distributorId,
+                                initialDateFilter: _dateFilter,
+                              ),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.milkBlue700,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 3,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.checklist_rtl_rounded,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _dateFilter == 'Today'
+                                          ? locale.t('total_today_orders')
+                                          : 'Total Orders & Checklist',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    Text(
+                                      '$totalOrdersCount Orders • $totalQty Pkts • ₹${totalRupees.toStringAsFixed(0)}',
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: 10.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    locale.t('view'),
+                                    style: const TextStyle(
+                                      color: AppColors.milkBlue800,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Icon(
+                                    Icons.arrow_forward_rounded,
+                                    size: 14,
+                                    color: AppColors.milkBlue800,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
 }
@@ -198,12 +588,13 @@ class _OrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final productsSummary = order.products.isNotEmpty
-        ? order.products.join(' • ')
+        ? order.products.map((p) => locale.translateProduct(p)).join(' • ')
         : (order.items.isNotEmpty
             ? order.items
-                .map((i) => '${i.productName} × ${i.quantity}')
+                .map((i) =>
+                    '${locale.translateProduct(i.productName)} × ${i.quantity}')
                 .join(' • ')
-            : 'Order details');
+            : locale.t('order_details'));
 
     return GestureDetector(
       onTap: () => Navigator.of(context).push(
@@ -234,7 +625,7 @@ class _OrderCard extends StatelessWidget {
                 ),
                 const Spacer(),
                 AppBadge(
-                  label: order.status,
+                  label: locale.translateStatus(order.status),
                   variant: orderStatusVariant(order.status),
                   showDot: false,
                 ),
@@ -284,7 +675,7 @@ class _OrderCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 AppBadge(
-                  label: order.paymentStatus,
+                  label: locale.translateStatus(order.paymentStatus),
                   variant: paymentStatusVariant(order.paymentStatus),
                   showDot: false,
                 ),
@@ -475,7 +866,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             ),
           ),
           AppBadge(
-            label: _currentStatus,
+            label: locale.translateStatus(_currentStatus),
             variant: orderStatusVariant(_currentStatus),
             showDot: false,
           ),
@@ -499,7 +890,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               Text(locale.t('shop_name'), style: AppTextStyles.overline),
               const Spacer(),
               AppBadge(
-                label: widget.order.paymentStatus,
+                label: locale.translateStatus(widget.order.paymentStatus),
                 variant: paymentStatusVariant(widget.order.paymentStatus),
                 showDot: false,
               ),
@@ -631,7 +1022,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   children: [
                     Expanded(
                       flex: 4,
-                      child: Text(item.productName, style: AppTextStyles.body),
+                      child: Text(locale.translateProduct(item.productName), style: AppTextStyles.body),
                     ),
                     Expanded(
                       flex: 1,
@@ -685,7 +1076,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             ),
           if (delivery > 0)
             _totalRow(
-              'Delivery Charge',
+              locale.t('delivery_charge'),
               '+₹${delivery.toStringAsFixed(delivery % 1 == 0 ? 0 : 2)}',
             ),
           const Divider(height: 16),
@@ -697,13 +1088,13 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           ),
           const SizedBox(height: 8),
           _totalRow(
-            'Payment Method',
-            widget.order.paymentMethod.toUpperCase(),
+            locale.t('payment_method'),
+            locale.translatePaymentMethod(widget.order.paymentMethod).toUpperCase(),
             color: AppColors.ink700,
           ),
           _totalRow(
-            'Payment Status',
-            widget.order.paymentStatus,
+            locale.t('payment_status'),
+            locale.translateStatus(widget.order.paymentStatus),
             bold: true,
             color: widget.order.paymentStatus.toLowerCase() == 'paid'
                 ? AppColors.dairyGreen700
@@ -757,10 +1148,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     final isDelivered = status == 'delivered' || status == 'completed';
 
     final steps = [
-      ('Pending', isPending),
-      ('Confirmed', isConfirmed),
-      ('Prepared', isPrepared),
-      ('Delivered', isDelivered),
+      (locale.t('order_new'), isPending),
+      (locale.t('order_confirmed'), isConfirmed),
+      (locale.t('order_prepared'), isPrepared),
+      (locale.t('order_delivered'), isDelivered),
     ];
 
     return _card(
@@ -853,7 +1244,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 )
               : const Icon(Icons.edit_note_rounded),
           label: Text(
-            _isUpdating ? 'Updating Status…' : 'Update Order Status (${_currentStatus})',
+            _isUpdating ? 'Updating Status…' : 'Update Order Status ($_currentStatus)',
           ),
         ),
       ),

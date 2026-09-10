@@ -1,24 +1,29 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
 import '../../core/colors.dart';
 import '../../core/text_styles.dart';
-import '../../data/mock_data.dart';
 import '../../services/auth_service.dart';
 import '../../services/order_service.dart';
+import '../../services/product_service.dart';
+import '../../state/auth_state.dart';
 import '../../state/locale_state.dart';
 import '../../widgets/app_badge.dart';
 import '../../widgets/broadcast_card.dart';
 import '../../widgets/kpi_card.dart';
 import '../../widgets/language_picker.dart';
-import '../../widgets/section_header.dart';
+import '../../widgets/bvh_logo_widget.dart';
 import 'distributor_profile_screen.dart';
-import 'product_management_screen.dart';
-import 'shop_management_screen.dart';
+import 'invoice_screen.dart';
+import 'notifications_screen.dart';
 import 'order_management_screen.dart';
 import 'payments_outstanding_screen.dart';
+import 'product_management_screen.dart';
 import 'reports_screen.dart';
-import 'invoice_screen.dart';
+import 'shop_management_screen.dart';
 import 'statement_screen.dart';
-import 'notifications_screen.dart';
+import 'total_orders_summary_screen.dart';
 
 class DistributorDashboardScreen extends StatefulWidget {
   const DistributorDashboardScreen({super.key});
@@ -121,7 +126,7 @@ class _DistributorSidebar extends StatelessWidget {
     _NavItem(Icons.settings_rounded, 'nav_settings'),
   ];
 
-  String _sidebarInitials(LocaleState locale) {
+  String _sidebarInitials() {
     final name = AuthService.currentUser?.displayName ?? '';
     if (name.isEmpty) return 'D';
     return name
@@ -153,18 +158,26 @@ class _DistributorSidebar extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  width: 38,
+                  height: 38,
+                  padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: Colors.white.withValues(alpha: 0.95),
                     borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                  child: const Icon(
-                    Icons.water_drop,
-                    color: Colors.white,
-                    size: 20,
+                  child: const BvhLogoWidget(
+                    size: 30,
+                    showCard: false,
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Text(
                   locale.t('app_name'),
                   style: AppTextStyles.h4.copyWith(color: Colors.white),
@@ -173,7 +186,7 @@ class _DistributorSidebar extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          // Nav items (first 5 are main tabs)
+          // Nav items
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -192,7 +205,7 @@ class _DistributorSidebar extends StatelessWidget {
                         // Navigate to standalone screens
                         final screens = [
                           const InvoiceScreen(),
-                          const StatementScreen(shopName: 'Sharma Kirana'),
+                          const StatementScreen(shopName: 'All Shops'),
                           const ReportsScreen(),
                           const Scaffold(body: Center(child: Text('Settings'))),
                         ];
@@ -239,12 +252,11 @@ class _DistributorSidebar extends StatelessWidget {
               },
             ),
           ),
-          // ── Bottom: profile · language · logout ──────────────────
+          // Bottom profile & logout
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                // Profile row
                 InkWell(
                   borderRadius: BorderRadius.circular(10),
                   onTap: () => Navigator.of(context).push(
@@ -263,12 +275,11 @@ class _DistributorSidebar extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        // Mini avatar
                         Container(
                           width: 32,
                           height: 32,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
                               colors: [
                                 AppColors.milkBlue500,
                                 AppColors.milkBlue700,
@@ -278,7 +289,7 @@ class _DistributorSidebar extends StatelessWidget {
                           ),
                           child: Center(
                             child: Text(
-                              _sidebarInitials(locale),
+                              _sidebarInitials(),
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 12,
@@ -359,6 +370,24 @@ class _DistributorSidebar extends StatelessWidget {
   }
 }
 
+// ── Top Product Model Helper ──────────────────────────────────────────────────
+
+class _TopProductStat {
+  final String productName;
+  final String packSize;
+  final String emoji;
+  final double unitPrice;
+  int quantitySold = 0;
+  double totalRevenue = 0.0;
+
+  _TopProductStat({
+    required this.productName,
+    required this.packSize,
+    required this.emoji,
+    required this.unitPrice,
+  });
+}
+
 // ── Dashboard Content ─────────────────────────────────────────────────────────
 
 class _DashboardContent extends StatelessWidget {
@@ -368,236 +397,659 @@ class _DashboardContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final locale = LocaleScope.of(context);
+    final auth = AuthStateScope.of(context);
+    final distributorId = auth.distributorId ??
+        AuthService.currentUser?.uid ??
+        '';
+
+    if (distributorId.isEmpty) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                locale.t('loading'),
+                style: AppTextStyles.bodyBold.copyWith(color: AppColors.ink700),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final numberFormat = NumberFormat('#,##,##0', 'en_IN');
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        slivers: [
-          // Top bar
-          SliverToBoxAdapter(child: _buildTopBar(context, locale)),
-          // Broadcast to all shops
-          const SliverToBoxAdapter(child: DistributorBroadcastCard()),
-          // KPI cards
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-              child: SectionHeader(title: locale.t('nav_dashboard')),
-            ),
-          ),
-          SliverToBoxAdapter(child: _buildKpiRow(locale)),
-          // Sales chart
-          SliverToBoxAdapter(
-            child: _buildSectionCard(
-              context,
-              title: locale.t('sales_overview'),
-              subtitle: locale.t('7_day_sales'),
-              child: _buildBarChart(),
-            ),
-          ),
-          // Payment summary + Recent orders
-          SliverToBoxAdapter(child: _buildPaymentSummary(locale)),
-          SliverToBoxAdapter(
-            child: _buildSectionCard(
-              context,
-              title: locale.t('recent_orders'),
-              actionLabel: locale.t('view_all'),
-              onAction: () => onNavigate(const OrderManagementScreen()),
-              child: _buildOrdersTable(locale),
-            ),
-          ),
-          // Top products + Low stock
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: _buildSectionCard(
-                      context,
-                      title: locale.t('top_products'),
-                      child: _buildTopProducts(),
-                      noPadding: true,
-                    ),
+      body: StreamBuilder<List<OrderModel>>(
+        stream: OrderService.streamDistributorOrders(distributorId: distributorId),
+        builder: (context, ordersSnapshot) {
+          final allOrders = ordersSnapshot.data ?? [];
+          final isOrdersLoading = ordersSnapshot.connectionState ==
+                  ConnectionState.waiting &&
+              !ordersSnapshot.hasData;
+
+          // ── Date calculations ──────────────────────────────────────────
+          final now = DateTime.now();
+          final todayStart = DateTime(now.year, now.month, now.day);
+          final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+          bool isToday(DateTime? dt) {
+            if (dt == null) return false;
+            return dt.isAfter(todayStart.subtract(const Duration(seconds: 1))) &&
+                dt.isBefore(todayEnd.add(const Duration(seconds: 1)));
+          }
+
+          final yesterdayStart = todayStart.subtract(const Duration(days: 1));
+          final yesterdayEnd = DateTime(
+            yesterdayStart.year,
+            yesterdayStart.month,
+            yesterdayStart.day,
+            23,
+            59,
+            59,
+          );
+
+          bool isYesterday(DateTime? dt) {
+            if (dt == null) return false;
+            return dt.isAfter(
+                  yesterdayStart.subtract(const Duration(seconds: 1)),
+                ) &&
+                dt.isBefore(yesterdayEnd.add(const Duration(seconds: 1)));
+          }
+
+          // ── Today & Yesterday metrics ──────────────────────────────────
+          final todaysOrders =
+              allOrders.where((o) => isToday(o.createdAt)).toList();
+          final todaysOrdersCount = todaysOrders.length;
+          final todaysSales = todaysOrders.fold<double>(
+            0.0,
+            (acc, o) => acc + o.totalAmount,
+          );
+
+          final yestOrders =
+              allOrders.where((o) => isYesterday(o.createdAt)).toList();
+          final yestSales = yestOrders.fold<double>(
+            0.0,
+            (acc, o) => acc + o.totalAmount,
+          );
+
+          final orderDeltaCount = todaysOrdersCount - yestOrders.length;
+          final orderDeltaStr = orderDeltaCount == 0
+              ? 'Same as yest.'
+              : (orderDeltaCount > 0
+                  ? '+$orderDeltaCount vs yest.'
+                  : '$orderDeltaCount vs yest.');
+
+          final salesDeltaPercent = yestSales > 0
+              ? (((todaysSales - yestSales) / yestSales) * 100).round()
+              : (todaysSales > 0 ? 100 : 0);
+          final salesDeltaStr = salesDeltaPercent >= 0
+              ? '+$salesDeltaPercent% vs yest.'
+              : '$salesDeltaPercent% vs yest.';
+
+          // ── Payment summary & outstanding calculations ─────────────────
+          double totalCollected = 0.0;
+          double totalPending = 0.0;
+          double totalOverdue = 0.0;
+          int pendingOrdersCount = 0;
+          final sevenDaysAgo = now.subtract(const Duration(days: 7));
+
+          for (final order in allOrders) {
+            final pStatus = order.paymentStatus.trim().toLowerCase();
+            final oStatus = order.status.trim().toLowerCase();
+            final isPaid = pStatus == 'paid' || oStatus == 'completed';
+            final isOverdue = pStatus == 'overdue' ||
+                (!isPaid &&
+                    order.createdAt != null &&
+                    order.createdAt!.isBefore(sevenDaysAgo));
+
+            if (isPaid) {
+              totalCollected += order.totalAmount;
+            } else if (isOverdue) {
+              totalOverdue += order.totalAmount;
+              totalPending += order.totalAmount;
+              pendingOrdersCount++;
+            } else {
+              totalPending += order.totalAmount;
+              pendingOrdersCount++;
+            }
+          }
+
+          // ── 7-Day sales breakdown ──────────────────────────────────────
+          final List<Map<String, dynamic>> last7DaysSales = [];
+          double maxSalesIn7Days = 0.0;
+
+          for (int i = 6; i >= 0; i--) {
+            final d = now.subtract(Duration(days: i));
+            final dStart = DateTime(d.year, d.month, d.day);
+            final dEnd = DateTime(d.year, d.month, d.day, 23, 59, 59);
+            final dayName = DateFormat('E').format(d);
+
+            final dayOrders = allOrders.where((o) {
+              final dt = o.createdAt;
+              if (dt == null) return false;
+              return dt.isAfter(dStart.subtract(const Duration(seconds: 1))) &&
+                  dt.isBefore(dEnd.add(const Duration(seconds: 1)));
+            });
+
+            final dayTotal =
+                dayOrders.fold<double>(0.0, (acc, o) => acc + o.totalAmount);
+            if (dayTotal > maxSalesIn7Days) maxSalesIn7Days = dayTotal;
+
+            last7DaysSales.add({
+              'day': dayName,
+              'date': d,
+              'amount': dayTotal,
+            });
+          }
+
+          // ── Top selling products aggregation ───────────────────────────
+          final Map<String, _TopProductStat> productSalesMap = {};
+          for (final order in allOrders) {
+            if (order.items.isNotEmpty) {
+              for (final item in order.items) {
+                final key =
+                    '${item.productName.trim().toLowerCase()}_${item.packSize.trim().toLowerCase()}';
+                final stat = productSalesMap.putIfAbsent(
+                  key,
+                  () => _TopProductStat(
+                    productName: item.productName.trim(),
+                    packSize: item.packSize.trim(),
+                    emoji: item.emoji.isNotEmpty ? item.emoji : '🥛',
+                    unitPrice: item.price,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildSectionCard(
-                      context,
-                      title: locale.t('low_stock'),
-                      child: _buildLowStock(locale),
-                      noPadding: true,
-                    ),
+                );
+                stat.quantitySold += item.quantity;
+                stat.totalRevenue += item.subtotal;
+              }
+            } else if (order.products.isNotEmpty) {
+              for (final prodStr in order.products) {
+                final key = prodStr.trim().toLowerCase();
+                final stat = productSalesMap.putIfAbsent(
+                  key,
+                  () => _TopProductStat(
+                    productName: prodStr.trim(),
+                    packSize: '500ml',
+                    emoji: '🥛',
+                    unitPrice: 30.0,
                   ),
-                ],
+                );
+                stat.quantitySold += 1;
+                stat.totalRevenue += (order.totalAmount > 0
+                    ? (order.totalAmount / order.products.length)
+                    : 30.0);
+              }
+            }
+          }
+
+          final topProductsList = productSalesMap.values.toList()
+            ..sort((a, b) => b.quantitySold.compareTo(a.quantitySold));
+
+          return CustomScrollView(
+            slivers: [
+              // Top Bar
+              SliverToBoxAdapter(
+                child: _buildTopBar(context, locale, distributorId),
               ),
-            ),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 32)),
-        ],
+
+              // Broadcast to all shops
+              const SliverToBoxAdapter(child: DistributorBroadcastCard()),
+
+              // KPI Section Header
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          locale.t('nav_dashboard'),
+                          style: AppTextStyles.h4,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.dairyGreen100,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.dairyGreen500.withValues(
+                              alpha: 0.5,
+                            ),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: AppColors.dairyGreen600,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            const Text(
+                              'LIVE',
+                              style: TextStyle(
+                                color: AppColors.dairyGreen700,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Real-time KPI cards row
+              SliverToBoxAdapter(
+                child: _buildRealTimeKpiRow(
+                  distributorId: distributorId,
+                  todaysOrdersCount: todaysOrdersCount,
+                  orderDeltaStr: orderDeltaStr,
+                  orderDeltaPositive: orderDeltaCount >= 0,
+                  todaysSales: todaysSales,
+                  salesDeltaStr: salesDeltaStr,
+                  salesDeltaPositive: salesDeltaPercent >= 0,
+                  totalPending: totalPending,
+                  pendingOrdersCount: pendingOrdersCount,
+                  outstandingAmount: totalPending,
+                  totalOverdue: totalOverdue,
+                  numberFormat: numberFormat,
+                  locale: locale,
+                  onNavigate: onNavigate,
+                ),
+              ),
+
+              // 7-Day Real-Time Sales Chart
+              SliverToBoxAdapter(
+                child: _buildSectionCard(
+                  context,
+                  title: locale.t('sales_overview'),
+                  subtitle: locale.t('7_day_sales'),
+                  actionLabel: locale.t('view_all'),
+                  onAction: () => onNavigate(
+                    const TotalOrdersSummaryScreen(
+                      initialDateFilter: 'This Week',
+                    ),
+                  ),
+                  child: _buildRealTimeBarChart(
+                    salesData: last7DaysSales,
+                    maxVal: maxSalesIn7Days,
+                    locale: locale,
+                    numberFormat: numberFormat,
+                  ),
+                ),
+              ),
+
+              // Real-Time Payment Summary
+              SliverToBoxAdapter(
+                child: _buildRealTimePaymentSummary(
+                  totalCollected: totalCollected,
+                  totalPending: totalPending,
+                  totalOverdue: totalOverdue,
+                  numberFormat: numberFormat,
+                  locale: locale,
+                  onNavigate: onNavigate,
+                ),
+              ),
+
+              // Real-Time Recent Orders
+              SliverToBoxAdapter(
+                child: _buildSectionCard(
+                  context,
+                  title: locale.t('recent_orders'),
+                  subtitle: allOrders.isNotEmpty
+                      ? '${allOrders.length} total orders recorded'
+                      : null,
+                  actionLabel: locale.t('view_all'),
+                  onAction: () => onNavigate(const OrderManagementScreen()),
+                  child: _buildRealTimeOrdersTable(
+                    orders: allOrders.take(5).toList(),
+                    isLoading: isOrdersLoading,
+                    numberFormat: numberFormat,
+                    locale: locale,
+                    onNavigate: onNavigate,
+                  ),
+                ),
+              ),
+
+              // Top Products + Real-Time Low Stock
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: _buildSectionCard(
+                          context,
+                          title: locale.t('top_products'),
+                          actionLabel: locale.t('view_all'),
+                          onAction: () => onNavigate(
+                            const TotalOrdersSummaryScreen(
+                              initialDateFilter: 'All Time',
+                            ),
+                          ),
+                          child: _buildRealTimeTopProducts(
+                            topProducts: topProductsList.take(4).toList(),
+                            distributorId: distributorId,
+                            numberFormat: numberFormat,
+                            locale: locale,
+                          ),
+                          noPadding: true,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildSectionCard(
+                          context,
+                          title: locale.t('low_stock'),
+                          actionLabel: locale.t('view_all'),
+                          onAction: () =>
+                              onNavigate(const ProductManagementScreen()),
+                          child: _buildRealTimeLowStock(
+                            distributorId: distributorId,
+                            locale: locale,
+                          ),
+                          noPadding: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 40)),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildTopBar(BuildContext context, LocaleState locale) {
+  Widget _buildTopBar(
+    BuildContext context,
+    LocaleState locale,
+    String distributorId,
+  ) {
     final top = MediaQuery.of(context).padding.top;
     final user = AuthService.currentUser;
-    final displayName = user?.displayName ?? locale.t('app_name');
-    final initials = displayName
-        .trim()
-        .split(' ')
-        .map((w) => w.isNotEmpty ? w[0] : '')
-        .take(2)
-        .join()
-        .toUpperCase();
 
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, top + 16, 20, 16),
-      decoration: const BoxDecoration(
-        gradient: AppColors.headerGradient,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(24),
-          bottomRight: Radius.circular(24),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  locale.t('app_name'),
-                  style: AppTextStyles.h4.copyWith(color: Colors.white),
-                ),
-                Text(
-                  displayName,
-                  style: AppTextStyles.caption.copyWith(color: Colors.white70),
-                ),
-              ],
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: distributorId.isNotEmpty
+          ? AuthService.distributorStream(distributorId)
+          : null,
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data() ?? {};
+        final companyName = (data['companyName'] ??
+                data['name'] ??
+                user?.displayName ??
+                'MilkRoute Distributor')
+            .toString();
+        final ownerName = (data['distributorName'] ??
+                data['ownerName'] ??
+                user?.displayName ??
+                '')
+            .toString();
+
+        final displayName = companyName.isNotEmpty
+            ? companyName
+            : (ownerName.isNotEmpty ? ownerName : 'Distributor');
+        final initials = displayName
+            .trim()
+            .split(' ')
+            .map((w) => w.isNotEmpty ? w[0] : '')
+            .take(2)
+            .join()
+            .toUpperCase();
+
+        return Container(
+          padding: EdgeInsets.fromLTRB(20, top + 16, 20, 16),
+          decoration: const BoxDecoration(
+            gradient: AppColors.headerGradient,
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(24),
+              bottomRight: Radius.circular(24),
             ),
           ),
-          // Notifications
-          IconButton(
-            icon: Stack(
-              children: [
-                const Icon(
-                  Icons.notifications_outlined,
-                  color: Colors.white,
-                  size: 24,
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      companyName,
+                      style: AppTextStyles.h4.copyWith(color: Colors.white),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (ownerName.isNotEmpty && ownerName != companyName)
+                      Text(
+                        'Prop: $ownerName',
+                        style: AppTextStyles.caption.copyWith(
+                          color: Colors.white70,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      )
+                    else
+                      Text(
+                        locale.t('dist_orders_mgmt'),
+                        style: AppTextStyles.caption.copyWith(
+                          color: Colors.white70,
+                        ),
+                      ),
+                  ],
                 ),
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: AppColors.amber500,
-                      shape: BoxShape.circle,
+              ),
+              // Notifications
+              IconButton(
+                icon: Stack(
+                  children: [
+                    const Icon(
+                      Icons.notifications_outlined,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: AppColors.amber500,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const NotificationsScreen(),
+                  ),
+                ),
+              ),
+              const LanguagePillButton(),
+              const SizedBox(width: 8),
+              // Profile avatar button
+              GestureDetector(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const DistributorProfileScreen(),
+                  ),
+                ),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Colors.white24, Colors.white10],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.5),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      initials.isEmpty ? 'D' : initials,
+                      style: AppTextStyles.captionBold.copyWith(
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
-              ],
-            ),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-            ),
+              ),
+            ],
           ),
-          const LanguagePillButton(),
-          const SizedBox(width: 8),
-          // ── Profile avatar button ─────────────────────────────────────
-          GestureDetector(
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const DistributorProfileScreen(),
-              ),
-            ),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Colors.white24, Colors.white10],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  width: 1.5,
-                ),
-              ),
-              child: Center(
-                child: Text(
-                  initials.isEmpty ? 'D' : initials,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    fontFamily: 'Poppins',
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildKpiRow(LocaleState locale) {
-    final cards = [
-      KpiCard(
-        label: locale.t('total_shops'),
-        value: '48',
-        icon: Icons.store_rounded,
-        delta: '+3',
-        deltaPositive: true,
-      ),
-      KpiCard(
-        label: locale.t('todays_orders'),
-        value: '23',
-        icon: Icons.receipt_long_rounded,
-        iconColor: AppColors.dairyGreen700,
-        iconBg: AppColors.dairyGreen100,
-        delta: '+5',
-        deltaPositive: true,
-      ),
-      KpiCard(
-        label: locale.t('todays_sales'),
-        value: '₹12,840',
-        icon: Icons.trending_up_rounded,
-        iconColor: AppColors.amber600,
-        iconBg: AppColors.amber100,
-        delta: '+8%',
-        deltaPositive: true,
-      ),
-      KpiCard(
-        label: locale.t('pending_payments'),
-        value: '₹8,320',
-        icon: Icons.hourglass_empty_rounded,
-        iconColor: AppColors.red600,
-        iconBg: AppColors.red100,
-        delta: '-2',
-        deltaPositive: false,
-      ),
-      KpiCard(
-        label: locale.t('outstanding_amount'),
-        value: '₹15,400',
-        icon: Icons.account_balance_wallet_rounded,
-        iconColor: AppColors.red600,
-        iconBg: AppColors.red100,
-      ),
-    ];
-
+  Widget _buildRealTimeKpiRow({
+    required String distributorId,
+    required int todaysOrdersCount,
+    required String orderDeltaStr,
+    required bool orderDeltaPositive,
+    required double todaysSales,
+    required String salesDeltaStr,
+    required bool salesDeltaPositive,
+    required double totalPending,
+    required int pendingOrdersCount,
+    required double outstandingAmount,
+    required double totalOverdue,
+    required NumberFormat numberFormat,
+    required LocaleState locale,
+    required void Function(Widget) onNavigate,
+  }) {
     return SizedBox(
       height: 140,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-        itemCount: cards.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 12),
-        itemBuilder: (_, i) => SizedBox(width: 180, child: cards[i]),
+      child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('distributor')
+            .doc(distributorId)
+            .collection('shops')
+            .snapshots(),
+        builder: (context, snapshot) {
+          final shopsDocs = snapshot.data?.docs ?? [];
+          final totalShops = shopsDocs.length;
+          final pendingShops = shopsDocs
+              .where((d) => (d.data()['status'] ?? '') == 'pending')
+              .length;
+          final activeShops = shopsDocs
+              .where((d) => (d.data()['status'] ?? '') == 'active')
+              .length;
+
+          final shopsDelta = pendingShops > 0
+              ? '+$pendingShops pending'
+              : (activeShops > 0 ? '$activeShops active' : '0 active');
+
+          final cards = [
+            // Total Shops Card
+            GestureDetector(
+              onTap: () => onNavigate(const ShopManagementScreen()),
+              child: KpiCard(
+                label: locale.t('total_shops'),
+                value: '$totalShops',
+                icon: Icons.store_rounded,
+                delta: shopsDelta,
+                deltaPositive: pendingShops > 0 || activeShops > 0,
+              ),
+            ),
+
+            // Today's Orders Card
+            GestureDetector(
+              onTap: () => onNavigate(
+                const TotalOrdersSummaryScreen(initialDateFilter: 'Today'),
+              ),
+              child: KpiCard(
+                label: locale.t('todays_orders'),
+                value: '$todaysOrdersCount',
+                icon: Icons.receipt_long_rounded,
+                iconColor: AppColors.dairyGreen700,
+                iconBg: AppColors.dairyGreen100,
+                delta: orderDeltaStr,
+                deltaPositive: orderDeltaPositive,
+              ),
+            ),
+
+            // Today's Sales Card
+            GestureDetector(
+              onTap: () => onNavigate(
+                const TotalOrdersSummaryScreen(initialDateFilter: 'Today'),
+              ),
+              child: KpiCard(
+                label: locale.t('todays_sales'),
+                value: '₹${numberFormat.format(todaysSales)}',
+                icon: Icons.trending_up_rounded,
+                iconColor: AppColors.amber600,
+                iconBg: AppColors.amber100,
+                delta: salesDeltaStr,
+                deltaPositive: salesDeltaPositive,
+              ),
+            ),
+
+            // Pending Payments Card
+            GestureDetector(
+              onTap: () => onNavigate(const PaymentsOutstandingScreen()),
+              child: KpiCard(
+                label: locale.t('pending_payments'),
+                value: '₹${numberFormat.format(totalPending)}',
+                icon: Icons.hourglass_empty_rounded,
+                iconColor: AppColors.red600,
+                iconBg: AppColors.red100,
+                delta: '$pendingOrdersCount orders',
+                deltaPositive: false,
+              ),
+            ),
+
+            // Outstanding Amount Card
+            GestureDetector(
+              onTap: () => onNavigate(const PaymentsOutstandingScreen()),
+              child: KpiCard(
+                label: locale.t('outstanding_amount'),
+                value: '₹${numberFormat.format(outstandingAmount)}',
+                icon: Icons.account_balance_wallet_rounded,
+                iconColor: AppColors.milkBlue900,
+                iconBg: AppColors.milkBlue100,
+                delta: totalOverdue > 0
+                    ? '₹${numberFormat.format(totalOverdue)} overdue'
+                    : 'All clear',
+                deltaPositive: totalOverdue == 0,
+              ),
+            ),
+          ];
+
+          return ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            itemCount: cards.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            itemBuilder: (_, i) => SizedBox(width: 180, child: cards[i]),
+          );
+        },
       ),
     );
   }
@@ -664,70 +1116,144 @@ class _DashboardContent extends StatelessWidget {
     );
   }
 
-  Widget _buildBarChart() {
-    final maxVal = salesChartData
-        .map((e) => e['amount'] as double)
-        .reduce((a, b) => a > b ? a : b);
+  Widget _buildRealTimeBarChart({
+    required List<Map<String, dynamic>> salesData,
+    required double maxVal,
+    required LocaleState locale,
+    required NumberFormat numberFormat,
+  }) {
+    final effectiveMax = maxVal > 0 ? maxVal : 1.0;
+    final hasAnySales = maxVal > 0;
 
-    return SizedBox(
-      height: 150,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: salesChartData.map((d) {
-          final frac = (d['amount'] as double) / maxVal;
-          final isMax = d['amount'] == maxVal;
-          return Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (isMax)
-                    Text(
-                      '₹${((d['amount'] as double) / 1000).toStringAsFixed(1)}k',
-                      style: AppTextStyles.overline.copyWith(
-                        color: AppColors.milkBlue600,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 150,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: salesData.map((d) {
+              final amount = d['amount'] as double;
+              final frac = amount / effectiveMax;
+              final isMax = hasAnySales && amount == maxVal && amount > 0;
+
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (amount > 0)
+                        Text(
+                          amount >= 1000
+                              ? '₹${(amount / 1000).toStringAsFixed(1)}k'
+                              : '₹${amount.toInt()}',
+                          style: AppTextStyles.overline.copyWith(
+                            color: isMax
+                                ? AppColors.milkBlue700
+                                : AppColors.ink700,
+                            fontWeight:
+                                isMax ? FontWeight.w800 : FontWeight.w600,
+                            fontSize: 9.5,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        )
+                      else
+                        const SizedBox(height: 14),
+                      const SizedBox(height: 4),
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 500),
+                        curve: Curves.easeOutCubic,
+                        height: amount > 0
+                            ? (100 * frac).clamp(8.0, 100.0)
+                            : 4.0,
+                        decoration: BoxDecoration(
+                          gradient: amount > 0
+                              ? LinearGradient(
+                                  colors: isMax
+                                      ? [
+                                          AppColors.milkBlue700,
+                                          AppColors.milkBlue500,
+                                        ]
+                                      : [
+                                          AppColors.milkBlue300,
+                                          AppColors.milkBlue100,
+                                        ],
+                                  begin: Alignment.bottomCenter,
+                                  end: Alignment.topCenter,
+                                )
+                              : null,
+                          color: amount == 0 ? AppColors.border : null,
+                          borderRadius: BorderRadius.vertical(
+                            top: const Radius.circular(6),
+                            bottom: Radius.circular(amount == 0 ? 6 : 0),
+                          ),
+                        ),
                       ),
-                    ),
-                  const SizedBox(height: 4),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 600),
-                    height: 110 * frac,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: isMax
-                            ? [AppColors.milkBlue700, AppColors.milkBlue500]
-                            : [AppColors.milkBlue100, const Color(0xFFBDD8F6)],
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
+                      const SizedBox(height: 8),
+                      Text(
+                        locale.translateDate(d['day'] as String),
+                        style: AppTextStyles.overline.copyWith(
+                          color: isMax
+                              ? AppColors.milkBlue900
+                              : AppColors.ink500,
+                          fontWeight:
+                              isMax ? FontWeight.w700 : FontWeight.w500,
+                        ),
                       ),
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(6),
-                      ),
-                    ),
+                    ],
                   ),
-                  const SizedBox(height: 6),
-                  Text(d['day'] as String, style: AppTextStyles.overline),
-                ],
-              ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        if (!hasAnySales) ...[
+          const SizedBox(height: 10),
+          Center(
+            child: Text(
+              locale.t('no_sales_yet'),
+              style: AppTextStyles.caption.copyWith(color: AppColors.ink500),
             ),
-          );
-        }).toList(),
-      ),
+          ),
+        ],
+      ],
     );
   }
 
-  Widget _buildPaymentSummary(LocaleState locale) {
+  Widget _buildRealTimePaymentSummary({
+    required double totalCollected,
+    required double totalPending,
+    required double totalOverdue,
+    required NumberFormat numberFormat,
+    required LocaleState locale,
+    required void Function(Widget) onNavigate,
+  }) {
     final items = [
       (
         locale.t('collected'),
-        '₹42,600',
-        AppColors.dairyGreen500,
+        '₹${numberFormat.format(totalCollected)}',
+        AppColors.dairyGreen600,
         AppColors.dairyGreen100,
+        Icons.check_circle_rounded,
       ),
-      (locale.t('pending'), '₹8,320', AppColors.amber500, AppColors.amber100),
-      (locale.t('overdue'), '₹6,480', AppColors.red500, AppColors.red100),
+      (
+        locale.t('pending'),
+        '₹${numberFormat.format(totalPending)}',
+        AppColors.amber600,
+        AppColors.amber100,
+        Icons.hourglass_top_rounded,
+      ),
+      (
+        locale.t('overdue'),
+        '₹${numberFormat.format(totalOverdue)}',
+        AppColors.red600,
+        AppColors.red100,
+        Icons.warning_amber_rounded,
+      ),
     ];
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       padding: const EdgeInsets.all(16),
@@ -735,12 +1261,38 @@ class _DashboardContent extends StatelessWidget {
         color: AppColors.cardSurface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(locale.t('payment_summary'), style: AppTextStyles.h4),
-          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(locale.t('payment_summary'), style: AppTextStyles.h4),
+              TextButton(
+                onPressed: () => onNavigate(const PaymentsOutstandingScreen()),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  locale.t('view_all'),
+                  style: AppTextStyles.captionBold.copyWith(
+                    color: AppColors.milkBlue600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
           Row(
             children: items.map((item) {
               return Expanded(
@@ -748,7 +1300,7 @@ class _DashboardContent extends StatelessWidget {
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
-                    vertical: 14,
+                    vertical: 12,
                   ),
                   decoration: BoxDecoration(
                     color: item.$4,
@@ -757,11 +1309,29 @@ class _DashboardContent extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            item.$1,
+                            style: AppTextStyles.overline.copyWith(
+                              color: AppColors.ink700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Icon(item.$5, size: 14, color: item.$3),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
                       Text(
                         item.$2,
-                        style: AppTextStyles.h4.copyWith(color: item.$3),
+                        style: AppTextStyles.captionBold.copyWith(
+                          color: item.$3,
+                          fontSize: 14,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      Text(item.$1, style: AppTextStyles.caption),
                     ],
                   ),
                 ),
@@ -773,13 +1343,69 @@ class _DashboardContent extends StatelessWidget {
     );
   }
 
-  Widget _buildOrdersTable(LocaleState locale) {
-    final distId = AuthService.currentUser?.uid ?? '';
-    if (distId.isEmpty) {
-      return Column(
-        children: mockOrders.take(4).map((order) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+  Widget _buildRealTimeOrdersTable({
+    required List<OrderModel> orders,
+    required bool isLoading,
+    required NumberFormat numberFormat,
+    required LocaleState locale,
+    required void Function(Widget) onNavigate,
+  }) {
+    if (isLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (orders.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(
+                Icons.receipt_long_outlined,
+                size: 36,
+                color: AppColors.ink300,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                locale.t('no_orders_yet'),
+                style: AppTextStyles.captionBold.copyWith(
+                  color: AppColors.ink700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                locale.t('no_orders_sub'),
+                textAlign: TextAlign.center,
+                style: AppTextStyles.overline.copyWith(color: AppColors.ink500),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final timeFormat = DateFormat('hh:mm a');
+    final dateFormat = DateFormat('dd MMM');
+
+    return Column(
+      children: orders.map((order) {
+        final dt = order.createdAt;
+        final timeStr = dt != null
+            ? (DateTime.now().difference(dt).inDays == 0
+                ? timeFormat.format(dt)
+                : '${dateFormat.format(dt)}, ${timeFormat.format(dt)}')
+            : '';
+
+        return InkWell(
+          onTap: () => onNavigate(const OrderManagementScreen()),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
             child: Row(
               children: [
                 Expanded(
@@ -787,97 +1413,278 @@ class _DashboardContent extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(order.id, style: AppTextStyles.captionBold),
-                      Text(order.shopName, style: AppTextStyles.caption),
+                      Row(
+                        children: [
+                          Text(
+                            order.orderNumber,
+                            style: AppTextStyles.captionBold.copyWith(
+                              color: AppColors.milkBlue900,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                          if (timeStr.isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              timeStr,
+                              style: AppTextStyles.overline.copyWith(
+                                color: AppColors.ink500,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        order.shopName.isNotEmpty
+                            ? order.shopName
+                            : (order.shopOwner.isNotEmpty
+                                ? order.shopOwner
+                                : 'Customer'),
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.ink700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ],
                   ),
                 ),
                 Expanded(
                   flex: 2,
                   child: Text(
-                    '₹${order.total.toStringAsFixed(0)}',
-                    style: AppTextStyles.bodyBold,
+                    '₹${numberFormat.format(order.totalAmount)}',
+                    textAlign: TextAlign.right,
+                    style: AppTextStyles.bodyBold.copyWith(
+                      color: AppColors.ink900,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 12),
                 AppBadge(
-                  label: order.orderStatus,
-                  variant: orderStatusVariant(order.orderStatus),
+                  label: locale.translateStatus(order.status),
+                  variant: orderStatusVariant(order.status),
                   showDot: false,
                 ),
               ],
             ),
-          );
-        }).toList(),
-      );
-    }
+          ),
+        );
+      }).toList(),
+    );
+  }
 
-    return StreamBuilder<List<OrderModel>>(
-      stream: OrderService.streamDistributorOrders(distributorId: distId),
-      builder: (context, snapshot) {
-        final orders = snapshot.data ?? [];
-        if (orders.isEmpty) {
+  Widget _buildRealTimeTopProducts({
+    required List<_TopProductStat> topProducts,
+    required String distributorId,
+    required NumberFormat numberFormat,
+    required LocaleState locale,
+  }) {
+    if (topProducts.isEmpty) {
+      return StreamBuilder<List<Product>>(
+        stream: ProductService.streamProducts(distributorId),
+        builder: (context, snapshot) {
+          final products = snapshot.data ?? [];
+          if (products.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.all(20),
+              child: Center(
+                child: Text(
+                  locale.t('no_sales_yet'),
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.ink500,
+                  ),
+                ),
+              ),
+            );
+          }
+
           return Column(
-            children: mockOrders.take(4).map((order) {
+            children: products.take(4).map((p) {
               return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.fromLTRB(14, 6, 14, 10),
                 child: Row(
                   children: [
+                    Text(p.emoji, style: const TextStyle(fontSize: 20)),
+                    const SizedBox(width: 8),
                     Expanded(
-                      flex: 3,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(order.id, style: AppTextStyles.captionBold),
-                          Text(order.shopName, style: AppTextStyles.caption),
+                          Text(
+                            locale.translateProduct(p.name),
+                            style: AppTextStyles.label.copyWith(
+                              color: AppColors.ink900,
+                              fontSize: 12,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            p.packSize,
+                            style: AppTextStyles.overline.copyWith(
+                              color: AppColors.ink500,
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        '₹${order.total.toStringAsFixed(0)}',
-                        style: AppTextStyles.bodyBold,
-                      ),
-                    ),
-                    AppBadge(
-                      label: order.orderStatus,
-                      variant: orderStatusVariant(order.orderStatus),
-                      showDot: false,
+                    Text(
+                      '₹${numberFormat.format(p.price)}',
+                      style: AppTextStyles.captionBold.copyWith(fontSize: 12),
                     ),
                   ],
                 ),
               );
             }).toList(),
           );
+        },
+      );
+    }
+
+    return Column(
+      children: topProducts.map((p) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(14, 6, 14, 10),
+          child: Row(
+            children: [
+              Text(p.emoji, style: const TextStyle(fontSize: 20)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      locale.translateProduct(p.productName),
+                      style: AppTextStyles.label.copyWith(
+                        color: AppColors.ink900,
+                        fontSize: 12,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      '${p.quantitySold} ${locale.t('items_sold')} • ${p.packSize}',
+                      style: AppTextStyles.overline.copyWith(
+                        color: AppColors.milkBlue700,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                '₹${numberFormat.format(p.totalRevenue)}',
+                style: AppTextStyles.captionBold.copyWith(
+                  color: AppColors.dairyGreen700,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildRealTimeLowStock({
+    required String distributorId,
+    required LocaleState locale,
+  }) {
+    return StreamBuilder<List<Product>>(
+      stream: ProductService.streamProducts(distributorId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return const Padding(
+            padding: EdgeInsets.all(20),
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          );
+        }
+
+        final products = snapshot.data ?? [];
+        final lowStockProducts = products.where((p) => p.stock <= 15).toList()
+          ..sort((a, b) => a.stock.compareTo(b.stock));
+
+        if (lowStockProducts.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: AppColors.dairyGreen600,
+                  size: 28,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  locale.t('all_stocked'),
+                  style: AppTextStyles.captionBold.copyWith(
+                    color: AppColors.dairyGreen700,
+                    fontSize: 12,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  locale.t('stock_healthy'),
+                  style: AppTextStyles.overline.copyWith(
+                    color: AppColors.ink500,
+                    fontSize: 9.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
         }
 
         return Column(
-          children: orders.take(4).map((order) {
+          children: lowStockProducts.take(4).map((p) {
+            final frac = (p.stock / 20.0).clamp(0.0, 1.0);
+            final isCritical = p.stock <= 5;
+
             return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
+              padding: const EdgeInsets.fromLTRB(14, 6, 14, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    flex: 3,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(order.orderNumber, style: AppTextStyles.captionBold),
-                        Text(order.shopName, style: AppTextStyles.caption),
-                      ],
-                    ),
+                  Row(
+                    children: [
+                      Text(p.emoji, style: const TextStyle(fontSize: 18)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          locale.translateProduct(p.name),
+                          style: AppTextStyles.label.copyWith(
+                            color: AppColors.ink900,
+                            fontSize: 12,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        '${p.stock} ${locale.t('units_left')}',
+                        style: AppTextStyles.captionBold.copyWith(
+                          color: isCritical
+                              ? AppColors.red600
+                              : AppColors.amber600,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                   ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      '₹${order.totalAmount.toStringAsFixed(0)}',
-                      style: AppTextStyles.bodyBold,
-                    ),
-                  ),
-                  AppBadge(
-                    label: order.status,
-                    variant: orderStatusVariant(order.status),
-                    showDot: false,
+                  const SizedBox(height: 4),
+                  LinearProgressIndicator(
+                    value: frac,
+                    backgroundColor:
+                        isCritical ? AppColors.red100 : AppColors.amber100,
+                    color: isCritical ? AppColors.red500 : AppColors.amber500,
+                    borderRadius: BorderRadius.circular(4),
+                    minHeight: 5,
                   ),
                 ],
               ),
@@ -885,98 +1692,6 @@ class _DashboardContent extends StatelessWidget {
           }).toList(),
         );
       },
-    );
-  }
-
-  Widget _buildTopProducts() {
-    final top = [
-      ('Full Cream Milk 1L', '🥛', '₹54', '180 sold'),
-      ('Toned Milk 500ml', '🥛', '₹24', '162 sold'),
-      ('Fresh Curd 500g', '🍶', '₹40', '98 sold'),
-      ('Paneer 200g', '🧀', '₹90', '72 sold'),
-    ];
-    return Column(
-      children: top.map((p) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: Row(
-            children: [
-              Text(p.$2, style: const TextStyle(fontSize: 22)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      p.$1,
-                      style: AppTextStyles.label.copyWith(
-                        color: AppColors.ink900,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(p.$4, style: AppTextStyles.caption),
-                  ],
-                ),
-              ),
-              Text(p.$3, style: AppTextStyles.captionBold),
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildLowStock(LocaleState locale) {
-    final lowStockProducts = mockProducts.where((p) => p.stock <= 10).toList();
-    if (lowStockProducts.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(16),
-        child: Text(locale.t('no_data'), style: AppTextStyles.caption),
-      );
-    }
-    return Column(
-      children: lowStockProducts.map((p) {
-        final frac = p.stock / 20.0; // show as fraction of 20
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(p.emoji, style: const TextStyle(fontSize: 18)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      p.name,
-                      style: AppTextStyles.label.copyWith(
-                        color: AppColors.ink900,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Text(
-                    '${p.stock} left',
-                    style: AppTextStyles.captionBold.copyWith(
-                      color: AppColors.red600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              LinearProgressIndicator(
-                value: frac.clamp(0.0, 1.0),
-                backgroundColor: AppColors.red100,
-                color: AppColors.red500,
-                borderRadius: BorderRadius.circular(4),
-                minHeight: 5,
-              ),
-            ],
-          ),
-        );
-      }).toList(),
     );
   }
 }

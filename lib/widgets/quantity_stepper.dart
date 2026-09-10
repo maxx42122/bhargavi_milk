@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../core/colors.dart';
 import '../core/text_styles.dart';
+import '../state/locale_state.dart';
 
 /// An interactive quantity stepper with a direct editable text bar and +/- buttons.
 class QuantityStepper extends StatefulWidget {
@@ -91,14 +92,24 @@ class _QuantityStepperState extends State<QuantityStepper> {
         target > widget.maxStock!) {
       target = widget.maxStock!;
       if (mounted) {
+        String msg;
+        try {
+          final locale = LocaleScope.of(context);
+          final translatedName = widget.productName != null
+              ? locale.translateProduct(widget.productName!)
+              : null;
+          msg = translatedName != null
+              ? '$translatedName: ${widget.maxStock} ${locale.t('units_left')}'
+              : '${widget.maxStock} ${locale.t('units_left')}';
+        } catch (_) {
+          msg = widget.productName != null
+              ? 'Only ${widget.maxStock} available for ${widget.productName}'
+              : 'Only ${widget.maxStock} available in stock';
+        }
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              widget.productName != null
-                  ? 'Only ${widget.maxStock} available for ${widget.productName}'
-                  : 'Only ${widget.maxStock} available in stock',
-            ),
+            content: Text(msg),
             duration: const Duration(seconds: 2),
             backgroundColor: AppColors.amber600,
           ),

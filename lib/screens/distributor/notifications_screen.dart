@@ -108,7 +108,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         children: [
           GradientHeader(
             title: locale.t('notifications'),
-            subtitle: unreadCount > 0 ? '$unreadCount unread' : 'All caught up',
+            subtitle: unreadCount > 0
+                ? '$unreadCount ${locale.t('unread')}'
+                : locale.t('all_caught_up'),
             actions: [
               TextButton(
                 onPressed: () => setState(() {
@@ -173,7 +175,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                       style: AppTextStyles.captionBold,
                                     ),
                                     const Spacer(),
-                                    Text(n.time, style: AppTextStyles.overline),
+                                    Text(locale.translateRelativeTime(n.time), style: AppTextStyles.overline),
                                     if (!isRead) ...[
                                       const SizedBox(width: 6),
                                       Container(

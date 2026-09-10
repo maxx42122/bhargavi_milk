@@ -6,6 +6,7 @@ import '../../core/text_styles.dart';
 import '../../services/auth_service.dart';
 import '../../state/locale_state.dart';
 import '../../widgets/language_picker.dart';
+import '../../widgets/bvh_logo_widget.dart';
 
 class ShopRegisterScreen extends StatefulWidget {
   const ShopRegisterScreen({super.key});
@@ -142,7 +143,8 @@ class _ShopRegisterScreenState extends State<ShopRegisterScreen> {
       // We do NOT open the shop dashboard here because the distributor
       // still has to approve the request.
 
-      await _showPendingDialog();
+      final locale = LocaleScope.of(context);
+      await _showPendingDialog(locale);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
 
@@ -168,7 +170,7 @@ class _ShopRegisterScreenState extends State<ShopRegisterScreen> {
   // PENDING DIALOG
   // ---------------------------------------------------------------------------
 
-  Future<void> _showPendingDialog() async {
+  Future<void> _showPendingDialog(LocaleState locale) async {
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -191,21 +193,18 @@ class _ShopRegisterScreenState extends State<ShopRegisterScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              const Expanded(child: Text('Request Sent')),
+              Expanded(child: Text(locale.t('approval_pending'))),
             ],
           ),
-          content: const Text(
-            'Your shop registration request has been sent to the selected '
-            'distributor.\n\n'
-            'Your account is currently pending approval. '
-            'You can login after the distributor approves your request.',
+          content: Text(
+            locale.t('approval_pending_desc'),
           ),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.of(dialogContext).pop();
               },
-              child: const Text('OK'),
+              child: Text(locale.t('ok')),
             ),
           ],
         );
@@ -529,7 +528,17 @@ class _ShopRegisterScreenState extends State<ShopRegisterScreen> {
             icon: const Icon(Icons.arrow_back, color: Colors.white),
             onPressed: _loading ? null : () => Navigator.pop(context),
           ),
-
+          Container(
+            width: 38,
+            height: 38,
+            padding: const EdgeInsets.all(4),
+            margin: const EdgeInsets.only(right: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.95),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const BvhLogoWidget(size: 30, showCard: false),
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -597,7 +606,7 @@ class _ShopRegisterScreenState extends State<ShopRegisterScreen> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              'Refresh',
+                              locale.t('refresh'),
                               style: AppTextStyles.captionBold.copyWith(
                                 color: AppColors.milkBlue600,
                                 fontSize: 12,
@@ -633,7 +642,7 @@ class _ShopRegisterScreenState extends State<ShopRegisterScreen> {
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        'Loading distributors...',
+                        locale.t('loading_distributors'),
                         style: AppTextStyles.caption.copyWith(
                           color: AppColors.ink500,
                         ),
@@ -678,9 +687,9 @@ class _ShopRegisterScreenState extends State<ShopRegisterScreen> {
                           ),
                           visualDensity: VisualDensity.compact,
                         ),
-                        child: const Text(
-                          'Retry',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                        child: Text(
+                          locale.t('retry'),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],
@@ -723,9 +732,9 @@ class _ShopRegisterScreenState extends State<ShopRegisterScreen> {
                           ),
                           visualDensity: VisualDensity.compact,
                         ),
-                        child: const Text(
-                          'Refresh',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                        child: Text(
+                          locale.t('refresh'),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],

@@ -81,21 +81,21 @@ class OrderSuccessScreen extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    _row('Order ID', orderId),
+                    _row(locale.t('order_id'), orderId),
                     if (itemCount > 0) ...[
                       const SizedBox(height: 8),
-                      _row('Items', '$itemCount items'),
+                      _row(locale.t('items'), '$itemCount ${locale.t('items').toLowerCase()}'),
                     ],
                     const SizedBox(height: 8),
                     _row(
-                      'Total Amount',
+                      locale.t('total_amount'),
                       '₹${total.toStringAsFixed(total % 1 == 0 ? 0 : 2)}',
                       valueStyle: AppTextStyles.bodyBold.copyWith(
                         color: AppColors.dairyGreen700,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    _row('Expected Delivery', deliveryDate),
+                    _row(locale.t('expected_delivery'), locale.translateDate(deliveryDate)),
                   ],
                 ),
               ),

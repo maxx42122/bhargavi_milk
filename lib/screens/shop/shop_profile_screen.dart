@@ -4,12 +4,14 @@ import 'package:flutter/services.dart';
 import '../../core/colors.dart';
 import '../../core/text_styles.dart';
 import '../../services/auth_service.dart';
+import '../../services/order_service.dart';
 import '../../services/shop_service.dart';
 import '../../state/auth_state.dart';
 import '../../state/locale_state.dart';
 import '../../widgets/app_badge.dart';
 import '../../widgets/gradient_header.dart';
 import '../auth/login_screen.dart';
+import 'shop_payment_screen.dart';
 
 class ShopProfileScreen extends StatefulWidget {
   final String distributorId;
@@ -86,292 +88,377 @@ class _ShopProfileScreenState extends State<ShopProfileScreen> {
                 ],
               ),
               Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-                  children: [
-                    // SHOP IDENTITY CARD
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: AppColors.cardSurface,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.border),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.milkBlue900.withValues(alpha: 0.04),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 60,
-                            height: 60,
-                            decoration: BoxDecoration(
-                              color: AppColors.milkBlue50,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: AppColors.milkBlue100),
-                            ),
-                            child: Center(
-                              child: Text(
-                                shopName.isNotEmpty
-                                    ? shopName[0].toUpperCase()
-                                    : '🏪',
-                                style: const TextStyle(
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.milkBlue700,
-                                ),
+                child: StreamBuilder<List<OrderModel>>(
+                  stream: OrderService.streamShopOrders(
+                    distributorId: widget.distributorId,
+                    shopUid: widget.shopUid,
+                  ),
+                  builder: (context, ordersSnapshot) {
+                    final orders = ordersSnapshot.data ?? [];
+
+                    final computedOrdersCount =
+                        orders.isNotEmpty ? orders.length : (profile?.totalOrders ?? 0);
+
+                    final double computedTotalPurchase = orders.isNotEmpty
+                        ? orders.fold<double>(0.0, (acc, o) => acc + o.totalAmount)
+                        : (profile?.totalPurchase ?? 0.0);
+
+                    final double computedOutstanding = orders.isNotEmpty
+                        ? orders
+                            .where((o) =>
+                                o.paymentStatus.toLowerCase() == 'pending')
+                            .fold<double>(0.0, (acc, o) => acc + o.totalAmount)
+                        : (profile?.outstanding ?? 0.0);
+
+                    return ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+                      children: [
+                        // SHOP IDENTITY CARD
+                        Container(
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: AppColors.cardSurface,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.border),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.milkBlue900.withValues(alpha: 0.04),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
                               ),
-                            ),
+                            ],
                           ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  shopName,
-                                  style: AppTextStyles.h4,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 60,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  color: AppColors.milkBlue50,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: AppColors.milkBlue100),
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  ownerName,
-                                  style: AppTextStyles.caption.copyWith(
-                                    color: AppColors.ink700,
+                                child: Center(
+                                  child: Text(
+                                    shopName.isNotEmpty
+                                        ? shopName[0].toUpperCase()
+                                        : '🏪',
+                                    style: const TextStyle(
+                                      fontSize: 26,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.milkBlue700,
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(height: 6),
-                                AppBadge(
-                                  label: profile?.status == 'active'
-                                      ? 'Approved Partner'
-                                      : 'Status: ${profile?.status ?? "pending"}',
-                                  variant: profile?.status == 'active'
-                                      ? BadgeVariant.success
-                                      : BadgeVariant.neutral,
-                                  showDot: true,
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      shopName,
+                                      style: AppTextStyles.h4,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      ownerName,
+                                      style: AppTextStyles.caption.copyWith(
+                                        color: AppColors.ink700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    AppBadge(
+                                      label: profile?.status == 'active'
+                                          ? locale.t('approved_partner')
+                                          : '${locale.t('status')}: ${locale.translateStatus(profile?.status ?? "pending")}',
+                                      variant: profile?.status == 'active'
+                                          ? BadgeVariant.success
+                                          : BadgeVariant.neutral,
+                                      showDot: true,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.edit_outlined,
+                                  color: AppColors.milkBlue600,
+                                ),
+                                tooltip: locale.t('edit_profile'),
+                                onPressed: profile != null
+                                    ? () => _showEditProfileModal(context, profile)
+                                    : null,
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // OUTSTANDING DUES ACTION BANNER (IF ANY)
+                        if (computedOutstanding > 0) ...[
+                          const SizedBox(height: 14),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFFFF7ED), Color(0xFFFEF3C7)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: AppColors.amber500.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.amber600,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.account_balance_wallet_rounded,
+                                    color: Colors.white,
+                                    size: 22,
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Outstanding Balance',
+                                        style: AppTextStyles.captionBold.copyWith(
+                                          color: AppColors.amber800,
+                                        ),
+                                      ),
+                                      Text(
+                                        '₹${computedOutstanding.toStringAsFixed(0)}',
+                                        style: AppTextStyles.h3.copyWith(
+                                          color: AppColors.amber900,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ShopPaymentScreen(
+                                        amountDue: computedOutstanding,
+                                        distributorId: widget.distributorId,
+                                        distributorName: _distributorInfo?['companyName'],
+                                      ),
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.milkBlue600,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 10,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  child: Text(locale.t('pay_now')),
                                 ),
                               ],
                             ),
                           ),
-                          IconButton(
-                            icon: const Icon(
-                              Icons.edit_outlined,
-                              color: AppColors.milkBlue600,
-                            ),
-                            tooltip: 'Edit Profile',
-                            onPressed: profile != null
-                                ? () => _showEditProfileModal(context, profile)
-                                : null,
-                          ),
                         ],
-                      ),
-                    ),
 
-                    const SizedBox(height: 14),
+                        const SizedBox(height: 14),
 
-                    // ACCOUNT SUMMARY (ORDERS, SPENT, OUTSTANDING)
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.cardSurface,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Account Summary', style: AppTextStyles.label),
-                          const SizedBox(height: 12),
-                          Row(
+                        // ACCOUNT SUMMARY (ORDERS, SPENT, OUTSTANDING)
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.cardSurface,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _statItem(
-                                title: 'Total Orders',
-                                value: '${profile?.totalOrders ?? 0}',
-                                color: AppColors.milkBlue700,
-                                icon: Icons.receipt_long_outlined,
-                              ),
-                              _divider(),
-                              _statItem(
-                                title: 'Total Purchase',
-                                value:
-                                    '₹${(profile?.totalPurchase ?? 0).toStringAsFixed(0)}',
-                                color: AppColors.dairyGreen700,
-                                icon: Icons.shopping_bag_outlined,
-                              ),
-                              _divider(),
-                              _statItem(
-                                title: 'Outstanding',
-                                value:
-                                    '₹${(profile?.outstanding ?? 0).toStringAsFixed(0)}',
-                                color: (profile?.outstanding ?? 0) > 0
-                                    ? AppColors.amber600
-                                    : AppColors.ink500,
-                                icon: Icons.account_balance_wallet_outlined,
+                              Text(locale.t('account_summary'), style: AppTextStyles.label),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  _statItem(
+                                    title: locale.t('total_orders'),
+                                    value: '$computedOrdersCount',
+                                    color: AppColors.milkBlue700,
+                                    icon: Icons.receipt_long_outlined,
+                                  ),
+                                  _divider(),
+                                  _statItem(
+                                    title: locale.t('total_purchase'),
+                                    value:
+                                        '₹${computedTotalPurchase.toStringAsFixed(0)}',
+                                    color: AppColors.dairyGreen700,
+                                    icon: Icons.shopping_bag_outlined,
+                                  ),
+                                  _divider(),
+                                  _statItem(
+                                    title: locale.t('outstanding'),
+                                    value:
+                                        '₹${computedOutstanding.toStringAsFixed(0)}',
+                                    color: computedOutstanding > 0
+                                        ? AppColors.amber600
+                                        : AppColors.ink500,
+                                    icon: Icons.account_balance_wallet_outlined,
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
+                        ),
 
-                    const SizedBox(height: 14),
+                        const SizedBox(height: 14),
 
-                    // ASSIGNED DISTRIBUTOR CARD
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.cardSurface,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.local_shipping_outlined,
-                                color: AppColors.milkBlue600,
-                                size: 18,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Assigned Milk Distributor',
-                                style: AppTextStyles.bodyBold,
-                              ),
-                            ],
+                        // ASSIGNED DISTRIBUTOR CARD
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.cardSurface,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.border),
                           ),
-                          const Divider(height: 20),
-                          if (_loadingDistributor)
-                            const Center(
-                              child: Padding(
-                                padding: EdgeInsets.all(8),
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.local_shipping_outlined,
+                                    color: AppColors.milkBlue600,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    locale.t('assigned_distributor'),
+                                    style: AppTextStyles.bodyBold,
+                                  ),
+                                ],
                               ),
-                            )
-                          else if (_distributorInfo == null)
-                            Text(
-                              'Distributor ID: ${widget.distributorId}',
-                              style: AppTextStyles.caption,
-                            )
-                          else ...[
-                            _infoRow(
-                              Icons.business_outlined,
-                              'Company',
-                              _distributorInfo!['companyName'] ?? '',
-                            ),
-                            const SizedBox(height: 8),
-                            _infoRow(
-                              Icons.person_outline,
-                              'Contact Person',
-                              _distributorInfo!['distributorName'] ?? '',
-                            ),
-                            if (_distributorInfo!['mobile']?.isNotEmpty == true) ...[
-                              const SizedBox(height: 8),
-                              GestureDetector(
-                                onTap: () =>
-                                    _copyPhone(_distributorInfo!['mobile']!),
-                                child: _infoRow(
-                                  Icons.phone_outlined,
-                                  'Phone (tap to copy)',
-                                  _distributorInfo!['mobile']!,
-                                  color: AppColors.milkBlue600,
+                              const Divider(height: 20),
+                              if (_loadingDistributor)
+                                const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(8),
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                )
+                              else if (_distributorInfo == null)
+                                Text(
+                                  'Distributor ID: ${widget.distributorId}',
+                                  style: AppTextStyles.caption,
+                                )
+                              else ...[
+                                _infoRow(
+                                  Icons.business_outlined,
+                                  locale.t('company'),
+                                  _distributorInfo!['companyName'] ?? '',
                                 ),
-                              ),
+                                const SizedBox(height: 8),
+                                _infoRow(
+                                  Icons.person_outline,
+                                  locale.t('contact_person'),
+                                  _distributorInfo!['distributorName'] ?? '',
+                                ),
+                                if (_distributorInfo!['mobile']?.isNotEmpty == true) ...[
+                                  const SizedBox(height: 8),
+                                  GestureDetector(
+                                    onTap: () =>
+                                        _copyPhone(_distributorInfo!['mobile']!),
+                                    child: _infoRow(
+                                      Icons.phone_outlined,
+                                      '${locale.t('phone')} (tap to copy)',
+                                      _distributorInfo!['mobile']!,
+                                      color: AppColors.milkBlue600,
+                                    ),
+                                  ),
+                                ],
+                                if (_distributorInfo!['address']?.isNotEmpty == true) ...[
+                                  const SizedBox(height: 8),
+                                  _infoRow(
+                                    Icons.location_on_outlined,
+                                    locale.t('location'),
+                                    _distributorInfo!['address']!,
+                                  ),
+                                ],
+                              ],
                             ],
-                            if (_distributorInfo!['address']?.isNotEmpty == true) ...[
+                          ),
+                        ),
+
+                        const SizedBox(height: 14),
+
+                        // SHOP CONTACT & DELIVERY DETAILS
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.cardSurface,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.storefront_outlined,
+                                    color: AppColors.milkBlue600,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    locale.t('shop_details'),
+                                    style: AppTextStyles.bodyBold,
+                                  ),
+                                ],
+                              ),
+                              const Divider(height: 20),
+                              _infoRow(
+                                Icons.person_outline,
+                                locale.t('owner_name'),
+                                ownerName,
+                              ),
+                              const SizedBox(height: 8),
+                              _infoRow(
+                                Icons.phone_outlined,
+                                locale.t('phone'),
+                                profile?.mobile ?? '',
+                              ),
+                              if (profile?.email.isNotEmpty == true) ...[
+                                const SizedBox(height: 8),
+                                _infoRow(
+                                  Icons.email_outlined,
+                                  'Email',
+                                  profile!.email,
+                                ),
+                              ],
                               const SizedBox(height: 8),
                               _infoRow(
                                 Icons.location_on_outlined,
-                                'Location',
-                                _distributorInfo!['address']!,
+                                locale.t('delivery_address'),
+                                profile?.address ?? '',
                               ),
                             ],
-                          ],
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // SHOP CONTACT & DELIVERY DETAILS
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.cardSurface,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.storefront_outlined,
-                                color: AppColors.milkBlue600,
-                                size: 18,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Delivery & Contact Information',
-                                style: AppTextStyles.bodyBold,
-                              ),
-                            ],
-                          ),
-                          const Divider(height: 20),
-                          _infoRow(
-                            Icons.phone_outlined,
-                            locale.t('phone'),
-                            profile?.mobile.isNotEmpty == true
-                                ? profile!.mobile
-                                : 'Not specified',
-                          ),
-                          const SizedBox(height: 10),
-                          _infoRow(
-                            Icons.email_outlined,
-                            'Email',
-                            profile?.email.isNotEmpty == true
-                                ? profile!.email
-                                : 'Not specified',
-                          ),
-                          const SizedBox(height: 10),
-                          _infoRow(
-                            Icons.location_on_outlined,
-                            locale.t('delivery_address'),
-                            profile?.address.isNotEmpty == true
-                                ? profile!.address
-                                : 'Not specified',
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // LOGOUT BUTTON
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.red600,
-                          side: const BorderSide(color: AppColors.red500),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        onPressed: () => _confirmLogout(context, locale),
-                        icon: const Icon(Icons.logout, size: 18),
-                        label: Text(locale.t('logout')),
-                      ),
-                    ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
               ),
             ],
@@ -390,13 +477,12 @@ class _ShopProfileScreenState extends State<ShopProfileScreen> {
     return Expanded(
       child: Column(
         children: [
-          Icon(icon, size: 18, color: color),
+          Icon(icon, size: 20, color: color),
           const SizedBox(height: 6),
           Text(
             value,
-            style: AppTextStyles.data.copyWith(
+            style: AppTextStyles.h4.copyWith(
               color: color,
-              fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -561,8 +647,8 @@ class _ShopProfileScreenState extends State<ShopProfileScreen> {
             Text(locale.t('logout')),
           ],
         ),
-        content: const Text(
-          'Are you sure you want to log out of your shop account?',
+        content: Text(
+          locale.t('logout_shop_confirm'),
         ),
         actions: [
           TextButton(

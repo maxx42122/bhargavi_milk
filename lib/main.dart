@@ -2,9 +2,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
+import 'core/colors.dart';
+import 'core/text_styles.dart';
 import 'core/theme.dart';
 import 'firebase_options.dart';
 
+import 'screens/splash/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/distributor/distributor_dashboard_screen.dart';
 import 'screens/shop/shop_home_screen.dart';
@@ -53,7 +56,7 @@ class _MilkRouteAppState extends State<MilkRouteApp> {
               title: 'MilkRoute',
               debugShowCheckedModeBanner: false,
               theme: AppTheme.light,
-              home: _AuthGate(authState: _authState),
+              home: const AnimatedSplashScreen(),
             );
           },
         ),
@@ -257,8 +260,8 @@ class _ShopPendingScreen extends StatelessWidget {
                     rejected ? Icons.cancel_outlined : Icons.hourglass_top,
                     size: 40,
                     color: rejected
-                        ? const Color(0xFFC23A3A)
-                        : const Color(0xFFB4740A),
+                        ? AppColors.red600
+                        : AppColors.amber600,
                   ),
                 ),
 
@@ -266,12 +269,7 @@ class _ShopPendingScreen extends StatelessWidget {
 
                 Text(
                   rejected ? 'Registration Rejected' : 'Awaiting Approval',
-                  style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF152439),
-                  ),
+                  style: AppTextStyles.h3,
                 ),
 
                 const SizedBox(height: 10),
@@ -283,11 +281,9 @@ class _ShopPendingScreen extends StatelessWidget {
                       : 'Your registration request has been sent to the distributor. '
                             'You will be able to log in once they approve your account.',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontFamily: 'Inter',
+                  style: AppTextStyles.body.copyWith(
+                    color: AppColors.ink500,
                     fontSize: 14,
-                    color: Color(0xFF6B7A8F),
-                    height: 1.5,
                   ),
                 ),
 
@@ -301,19 +297,12 @@ class _ShopPendingScreen extends StatelessWidget {
                       await AuthService.signOut();
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1B7BD6),
+                      backgroundColor: AppColors.primaryBlue,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppColors.innerRadius),
                       ),
                     ),
-                    child: const Text(
-                      'Back to Login',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontFamily: 'Inter',
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    child: const Text('Back to Login'),
                   ),
                 ),
               ],

@@ -73,7 +73,7 @@ class _ShopManagementScreenState extends State<ShopManagementScreen>
           // ────────────────────────────────────────────────────────────────
           GradientHeader(
             title: locale.t('nav_customers'),
-            subtitle: 'Manage your shops and requests',
+            subtitle: locale.t('manage_shops_requests'),
           ),
 
           // ────────────────────────────────────────────────────────────────
@@ -134,7 +134,7 @@ class _ShopManagementScreenState extends State<ShopManagementScreen>
                     children: [
                       const Icon(Icons.person_add_alt_1_rounded, size: 15),
                       const SizedBox(width: 6),
-                      const Text('Requests'),
+                      Text(locale.t('requests')),
                       if (distributorId.isNotEmpty)
                         _PendingCountBadge(distributorId: distributorId),
                     ],
@@ -362,11 +362,11 @@ class _ShopListState extends State<_ShopList> {
                 ? Icons.person_add_alt_1_rounded
                 : Icons.store_outlined,
             title: widget.status == 'pending'
-                ? 'No Shop Requests'
-                : 'No Active Shops',
+                ? widget.locale.t('no_shop_requests')
+                : widget.locale.t('no_active_shops'),
             subtitle: widget.status == 'pending'
-                ? 'When a shop selects you as their distributor, their request will appear here.'
-                : 'Approved shops will appear here.',
+                ? widget.locale.t('no_shop_requests_sub')
+                : widget.locale.t('no_active_shops_sub'),
           );
         }
 
@@ -514,13 +514,9 @@ class _ShopCardState extends State<_ShopCard> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: const Text(
+          title: Text(
             'Reject Shop Request?',
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w600,
-              fontSize: 18,
-            ),
+            style: AppTextStyles.h4,
           ),
           content: Text(
             'Are you sure you want to reject the request from $shopName?\n\n'
@@ -599,13 +595,13 @@ class _ShopCardState extends State<_ShopCard> {
         : ((data['totalOrders'] as num?)?.toInt() ?? 0);
 
     final totalPurchase = widget.orders.isNotEmpty
-        ? widget.orders.fold<double>(0.0, (sum, o) => sum + o.totalAmount)
+        ? widget.orders.fold<double>(0.0, (acc, o) => acc + o.totalAmount)
         : ((data['totalPurchase'] as num?)?.toDouble() ?? 0.0);
 
     final outstanding = widget.orders.isNotEmpty
         ? widget.orders
             .where((o) => o.paymentStatus.toLowerCase() != 'paid')
-            .fold<double>(0.0, (sum, o) => sum + o.totalAmount)
+            .fold<double>(0.0, (acc, o) => acc + o.totalAmount)
         : ((data['outstanding'] as num?)?.toDouble() ?? 0.0);
 
     final createdAt = data['createdAt'] as Timestamp?;
@@ -705,7 +701,9 @@ class _ShopCardState extends State<_ShopCard> {
                 ),
 
                 AppBadge(
-                  label: isPending ? 'Pending' : widget.locale.t('shop_active'),
+                  label: isPending
+                      ? widget.locale.t('pay_pending')
+                      : widget.locale.t('shop_active'),
                   variant: isPending
                       ? BadgeVariant.warning
                       : BadgeVariant.success,
@@ -803,14 +801,14 @@ class _ShopCardState extends State<_ShopCard> {
               Row(
                 children: [
                   _StatChip(
-                    label: 'Orders',
+                    label: widget.locale.t('nav_orders'),
                     value: '$totalOrders',
                     icon: Icons.receipt_long_rounded,
                     color: AppColors.milkBlue600,
                   ),
                   const SizedBox(width: 8),
                   _StatChip(
-                    label: 'Purchase',
+                    label: widget.locale.t('total_purchase'),
                     value: totalPurchase >= 1000
                         ? '₹${(totalPurchase / 1000).toStringAsFixed(1)}k'
                         : '₹${totalPurchase.toStringAsFixed(0)}',
@@ -819,7 +817,7 @@ class _ShopCardState extends State<_ShopCard> {
                   ),
                   const SizedBox(width: 8),
                   _StatChip(
-                    label: 'Due',
+                    label: widget.locale.t('outstanding'),
                     value: '₹${outstanding.toStringAsFixed(0)}',
                     icon: Icons.account_balance_wallet_outlined,
                     color: outstanding > 0

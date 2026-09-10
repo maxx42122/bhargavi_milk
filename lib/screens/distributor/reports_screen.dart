@@ -123,11 +123,11 @@ class _SalesReportTab extends StatelessWidget {
         // Summary row
         Row(
           children: [
-            _summaryCard('₹67,200', 'Total Sales', AppColors.milkBlue600),
+            _summaryCard('₹67,200', locale.t('total_sales'), AppColors.milkBlue600),
             const SizedBox(width: 10),
-            _summaryCard('247', 'Orders', AppColors.dairyGreen700),
+            _summaryCard('247', locale.t('nav_orders'), AppColors.dairyGreen700),
             const SizedBox(width: 10),
-            _summaryCard('₹272', 'Avg. Order', AppColors.amber600),
+            _summaryCard('₹272', locale.t('avg_order'), AppColors.amber600),
           ],
         ),
         const SizedBox(height: 16),
@@ -188,7 +188,7 @@ class _SalesReportTab extends StatelessWidget {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              d['day'] as String,
+                              locale.translateDate(d['day'] as String),
                               style: AppTextStyles.overline,
                             ),
                           ],
@@ -285,7 +285,7 @@ class _ProductSalesTab extends StatelessWidget {
                 children: [
                   Text(item.$2, style: const TextStyle(fontSize: 24)),
                   const SizedBox(width: 12),
-                  Expanded(child: Text(item.$1, style: AppTextStyles.bodyBold)),
+                  Expanded(child: Text(locale.translateProduct(item.$1), style: AppTextStyles.bodyBold)),
                   Text(
                     item.$4,
                     style: AppTextStyles.bodyBold.copyWith(
@@ -293,7 +293,7 @@ class _ProductSalesTab extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text('${item.$3} sold', style: AppTextStyles.caption),
+                  Text('${item.$3} ${locale.t('items_sold')}', style: AppTextStyles.caption),
                 ],
               ),
               const SizedBox(height: 8),
@@ -361,7 +361,7 @@ class _ShopSalesTab extends StatelessWidget {
                   children: [
                     Text(s.shopName, style: AppTextStyles.bodyBold),
                     Text(
-                      '${s.totalOrders} orders',
+                      '${s.totalOrders} ${locale.t('nav_orders')}',
                       style: AppTextStyles.caption,
                     ),
                   ],
@@ -412,10 +412,10 @@ class _CollectionTab extends StatelessWidget {
                       children: [
                         Text(p.shopName, style: AppTextStyles.bodyBold),
                         Text(
-                          '${p.invoiceNo} • ${p.date}',
+                          '${p.invoiceNo} • ${locale.translateDate(p.date)}',
                           style: AppTextStyles.caption,
                         ),
-                        Text(p.method, style: AppTextStyles.caption),
+                        Text(locale.translatePaymentMethod(p.method), style: AppTextStyles.caption),
                       ],
                     ),
                   ),

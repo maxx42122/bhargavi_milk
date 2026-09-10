@@ -5,6 +5,7 @@ import '../../core/text_styles.dart';
 import '../../services/auth_service.dart';
 import '../../state/locale_state.dart';
 import '../../widgets/language_picker.dart';
+import '../../widgets/bvh_logo_widget.dart';
 import '../distributor/distributor_dashboard_screen.dart';
 
 class DistributorRegisterScreen extends StatefulWidget {
@@ -138,12 +139,12 @@ class _DistributorRegisterScreenState extends State<DistributorRegisterScreen> {
                     // Company Name
                     _field(
                       controller: _companyCtrl,
-                      label: 'Company Name',
+                      label: locale.t('company_name'),
                       hint: 'Bhargavi Distributors',
                       icon: Icons.business_rounded,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          return 'Required';
+                          return locale.t('required');
                         }
                         return null;
                       },
@@ -152,12 +153,12 @@ class _DistributorRegisterScreenState extends State<DistributorRegisterScreen> {
                     // Distributor Name
                     _field(
                       controller: _nameCtrl,
-                      label: 'Distributor Name',
+                      label: locale.t('distributor_name'),
                       hint: 'Your full name',
                       icon: Icons.person_outline,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          return 'Required';
+                          return locale.t('required');
                         }
                         return null;
                       },
@@ -166,13 +167,13 @@ class _DistributorRegisterScreenState extends State<DistributorRegisterScreen> {
                     // Address
                     _field(
                       controller: _addressCtrl,
-                      label: 'Address',
+                      label: locale.t('address'),
                       hint: '123, Dairy Road, Pune',
                       icon: Icons.location_on_outlined,
                       maxLines: 2,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          return 'Required';
+                          return locale.t('required');
                         }
                         return null;
                       },
@@ -181,19 +182,19 @@ class _DistributorRegisterScreenState extends State<DistributorRegisterScreen> {
                     // Mobile
                     _field(
                       controller: _mobileCtrl,
-                      label: 'Mobile Number',
+                      label: locale.t('mobile_number'),
                       hint: '9876543210',
                       icon: Icons.phone_outlined,
                       keyboardType: TextInputType.phone,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          return 'Required';
+                          return locale.t('required');
                         }
 
                         final mobile = v.trim();
 
                         if (mobile.length < 10) {
-                          return 'Enter valid mobile';
+                          return locale.t('enter_valid_mobile');
                         }
 
                         return null;
@@ -203,19 +204,19 @@ class _DistributorRegisterScreenState extends State<DistributorRegisterScreen> {
                     // Email
                     _field(
                       controller: _emailCtrl,
-                      label: 'Email Address',
+                      label: locale.t('email'),
                       hint: 'distributor@email.com',
                       icon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          return 'Required';
+                          return locale.t('required');
                         }
 
                         final email = v.trim();
 
                         if (!email.contains('@')) {
-                          return 'Enter valid email';
+                          return locale.t('enter_valid_email');
                         }
 
                         return null;
@@ -248,7 +249,7 @@ class _DistributorRegisterScreenState extends State<DistributorRegisterScreen> {
                     // Confirm Password
                     _passwordField(
                       controller: _confirmPassCtrl,
-                      label: 'Confirm Password',
+                      label: locale.t('confirm_password'),
                       obscure: _obscureConfirm,
                       onToggle: () {
                         setState(() {
@@ -257,11 +258,11 @@ class _DistributorRegisterScreenState extends State<DistributorRegisterScreen> {
                       },
                       validator: (v) {
                         if (v == null || v.isEmpty) {
-                          return 'Required';
+                          return locale.t('required');
                         }
 
                         if (v != _passCtrl.text) {
-                          return 'Passwords do not match';
+                          return locale.t('passwords_not_match');
                         }
 
                         return null;
@@ -285,7 +286,7 @@ class _DistributorRegisterScreenState extends State<DistributorRegisterScreen> {
                                 ),
                               )
                             : Text(
-                                'Register as Distributor',
+                                locale.t('register_as_distributor'),
                                 style: AppTextStyles.bodyBold.copyWith(
                                   color: Colors.white,
                                 ),
@@ -302,7 +303,7 @@ class _DistributorRegisterScreenState extends State<DistributorRegisterScreen> {
                             ? null
                             : () => Navigator.pop(context),
                         child: Text(
-                          'Already have an account? Login',
+                          locale.t('already_have_account'),
                           style: AppTextStyles.captionBold.copyWith(
                             color: AppColors.milkBlue600,
                           ),
@@ -339,17 +340,27 @@ class _DistributorRegisterScreenState extends State<DistributorRegisterScreen> {
             icon: const Icon(Icons.arrow_back, color: Colors.white),
             onPressed: _loading ? null : () => Navigator.pop(context),
           ),
-
+          Container(
+            width: 38,
+            height: 38,
+            padding: const EdgeInsets.all(4),
+            margin: const EdgeInsets.only(right: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.95),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const BvhLogoWidget(size: 30, showCard: false),
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Distributor Registration',
+                  locale.t('distributor_registration'),
                   style: AppTextStyles.h4.copyWith(color: Colors.white),
                 ),
                 Text(
-                  'Create your distributor account',
+                  locale.t('create_distributor_account'),
                   style: AppTextStyles.caption.copyWith(color: Colors.white70),
                 ),
               ],

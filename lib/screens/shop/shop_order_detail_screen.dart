@@ -3,17 +3,41 @@ import 'package:flutter/material.dart';
 import '../../core/colors.dart';
 import '../../core/text_styles.dart';
 import '../../services/order_service.dart';
+import '../../services/pdf_receipt_service.dart';
+import '../../services/shop_service.dart';
 import '../../state/locale_state.dart';
 import '../../widgets/app_badge.dart';
+import 'shop_payment_screen.dart';
 
-class ShopOrderDetailScreen extends StatelessWidget {
+class ShopOrderDetailScreen extends StatefulWidget {
   final OrderModel order;
 
   const ShopOrderDetailScreen({super.key, required this.order});
 
   @override
+  State<ShopOrderDetailScreen> createState() => _ShopOrderDetailScreenState();
+}
+
+class _ShopOrderDetailScreenState extends State<ShopOrderDetailScreen> {
+  Map<String, String>? _distributorInfo;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDistributorInfo();
+  }
+
+  Future<void> _loadDistributorInfo() async {
+    if (widget.order.distributorId.isNotEmpty) {
+      final info = await ShopService.fetchDistributorInfo(widget.order.distributorId);
+      if (mounted) setState(() => _distributorInfo = info);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final locale = LocaleScope.of(context);
+    final isPendingPayment = widget.order.paymentStatus.toLowerCase() == 'pending';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -22,18 +46,66 @@ class ShopOrderDetailScreen extends StatelessWidget {
           SliverToBoxAdapter(child: _buildHeader(context, locale)),
           SliverToBoxAdapter(child: _buildShopDeliveryInfo(locale)),
           SliverToBoxAdapter(child: _buildLineItems(locale)),
-          SliverToBoxAdapter(child: _buildTotals(locale)),
+          SliverToBoxAdapter(child: _buildTotals(context, locale)),
           SliverToBoxAdapter(child: _buildTimeline(locale)),
-          const SliverToBoxAdapter(child: SizedBox(height: 32)),
+          SliverToBoxAdapter(child: _buildInvoiceActions(context, locale)),
+          const SliverToBoxAdapter(child: SizedBox(height: 80)),
         ],
       ),
+      bottomNavigationBar: isPendingPayment
+          ? Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.cardSurface,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.milkBlue900.withValues(alpha: 0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                child: SizedBox(
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ShopPaymentScreen(
+                          order: widget.order,
+                          amountDue: widget.order.totalAmount,
+                          distributorId: widget.order.distributorId,
+                        ),
+                      ),
+                    ),
+                    icon: const Icon(Icons.payment_rounded, color: Colors.white),
+                    label: Text(
+                      '${locale.t("pay_now")} (₹${widget.order.totalAmount.toStringAsFixed(widget.order.totalAmount % 1 == 0 ? 0 : 2)})',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.dairyGreen600,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            )
+          : null,
     );
   }
 
   Widget _buildHeader(BuildContext context, LocaleState locale) {
     final top = MediaQuery.of(context).padding.top;
     return Container(
-      padding: EdgeInsets.fromLTRB(20, top + 16, 20, 20),
+      padding: EdgeInsets.fromLTRB(16, top + 12, 16, 20),
       decoration: const BoxDecoration(
         gradient: AppColors.headerGradient,
         borderRadius: BorderRadius.only(
@@ -56,15 +128,24 @@ class ShopOrderDetailScreen extends StatelessWidget {
                   style: AppTextStyles.h4.copyWith(color: Colors.white),
                 ),
                 Text(
-                  order.orderNumber,
+                  widget.order.orderNumber,
                   style: AppTextStyles.caption.copyWith(color: Colors.white70),
                 ),
               ],
             ),
           ),
+          IconButton(
+            icon: const Icon(Icons.receipt_long_outlined, color: Colors.white),
+            tooltip: locale.t('view_receipt'),
+            onPressed: () => PdfReceiptService.previewReceipt(
+              context: context,
+              order: widget.order,
+              distributorInfo: _distributorInfo,
+            ),
+          ),
           AppBadge(
-            label: order.orderStatus,
-            variant: orderStatusVariant(order.orderStatus),
+            label: locale.translateStatus(widget.order.orderStatus),
+            variant: orderStatusVariant(widget.order.orderStatus),
             showDot: false,
           ),
         ],
@@ -73,8 +154,8 @@ class ShopOrderDetailScreen extends StatelessWidget {
   }
 
   Widget _buildShopDeliveryInfo(LocaleState locale) {
-    final formattedDate = order.createdAt != null
-        ? '${order.createdAt!.day.toString().padLeft(2, '0')}/${order.createdAt!.month.toString().padLeft(2, '0')}/${order.createdAt!.year} ${order.createdAt!.hour.toString().padLeft(2, '0')}:${order.createdAt!.minute.toString().padLeft(2, '0')}'
+    final formattedDate = widget.order.createdAt != null
+        ? '${widget.order.createdAt!.day.toString().padLeft(2, '0')}/${widget.order.createdAt!.month.toString().padLeft(2, '0')}/${widget.order.createdAt!.year} ${widget.order.createdAt!.hour.toString().padLeft(2, '0')}:${widget.order.createdAt!.minute.toString().padLeft(2, '0')}'
         : 'Recently';
 
     return _card(
@@ -87,24 +168,24 @@ class ShopOrderDetailScreen extends StatelessWidget {
               Text(locale.t('shop_name'), style: AppTextStyles.overline),
               const Spacer(),
               AppBadge(
-                label: order.paymentStatus,
-                variant: paymentStatusVariant(order.paymentStatus),
+                label: locale.translateStatus(widget.order.paymentStatus),
+                variant: paymentStatusVariant(widget.order.paymentStatus),
                 showDot: false,
               ),
             ],
           ),
           const SizedBox(height: 4),
-          Text(order.shopName, style: AppTextStyles.bodyBold),
-          if (order.shopOwner.isNotEmpty) ...[
+          Text(widget.order.shopName, style: AppTextStyles.bodyBold),
+          if (widget.order.shopOwner.isNotEmpty) ...[
             const SizedBox(height: 2),
-            Text(order.shopOwner, style: AppTextStyles.caption),
+            Text(widget.order.shopOwner, style: AppTextStyles.caption),
           ],
           const Divider(height: 16),
           Row(
             children: [
               const Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.ink500),
               const SizedBox(width: 6),
-              Text('Placed: $formattedDate', style: AppTextStyles.caption),
+              Text('${locale.t('order_date')}: $formattedDate', style: AppTextStyles.caption),
             ],
           ),
           const SizedBox(height: 6),
@@ -112,11 +193,13 @@ class ShopOrderDetailScreen extends StatelessWidget {
             children: [
               const Icon(Icons.local_shipping_outlined, size: 14, color: AppColors.milkBlue600),
               const SizedBox(width: 6),
-              Text('Delivery: ${order.deliveryDate} (${order.deliveryTime})',
-                  style: AppTextStyles.captionBold.copyWith(color: AppColors.milkBlue700)),
+              Text(
+                '${locale.t('tag_delivery')}: ${locale.translateDate(widget.order.deliveryDate)} (${locale.translateDate(widget.order.deliveryTime)})',
+                style: AppTextStyles.captionBold.copyWith(color: AppColors.milkBlue700),
+              ),
             ],
           ),
-          if (order.deliveryAddress.isNotEmpty) ...[
+          if (widget.order.deliveryAddress.isNotEmpty) ...[
             const SizedBox(height: 6),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -124,7 +207,7 @@ class ShopOrderDetailScreen extends StatelessWidget {
                 const Icon(Icons.location_on_outlined, size: 14, color: AppColors.ink500),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Text(order.deliveryAddress, style: AppTextStyles.caption),
+                  child: Text(widget.order.deliveryAddress, style: AppTextStyles.caption),
                 ),
               ],
             ),
@@ -179,15 +262,15 @@ class ShopOrderDetailScreen extends StatelessWidget {
             ],
           ),
           const Divider(height: 16),
-          if (order.items.isEmpty)
-            ...order.products.map(
+          if (widget.order.items.isEmpty)
+            ...widget.order.products.map(
               (p) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(p, style: AppTextStyles.body),
               ),
             )
           else
-            ...order.items.map(
+            ...widget.order.items.map(
               (item) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Row(
@@ -203,13 +286,15 @@ class ShopOrderDetailScreen extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(item.name,
-                                    style: AppTextStyles.body,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis),
+                                Text(
+                                  locale.translateProduct(item.name),
+                                  style: AppTextStyles.body,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                                 if (item.packSize.isNotEmpty)
                                   Text(
-                                    '${item.packSize} • ${item.unit}',
+                                    '${item.packSize} • ${locale.translateUnit(item.unit)}',
                                     style: AppTextStyles.caption.copyWith(
                                       fontSize: 11,
                                       color: AppColors.ink500,
@@ -254,46 +339,46 @@ class ShopOrderDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTotals(LocaleState locale) {
+  Widget _buildTotals(BuildContext context, LocaleState locale) {
+    final isPaid = widget.order.paymentStatus.toLowerCase() == 'paid';
+
     return _card(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Column(
         children: [
           _totalRow(
             locale.t('subtotal'),
-            '₹${order.subtotal.toStringAsFixed(order.subtotal % 1 == 0 ? 0 : 2)}',
+            '₹${widget.order.subtotal.toStringAsFixed(widget.order.subtotal % 1 == 0 ? 0 : 2)}',
           ),
-          if (order.deliveryCharge > 0)
+          if (widget.order.deliveryCharge > 0)
             _totalRow(
               locale.t('delivery_charge'),
-              '₹${order.deliveryCharge.toStringAsFixed(0)}',
+              '₹${widget.order.deliveryCharge.toStringAsFixed(0)}',
             ),
-          if (order.discount > 0)
+          if (widget.order.discount > 0)
             _totalRow(
               locale.t('discount'),
-              '−₹${order.discount.toStringAsFixed(0)}',
+              '−₹${widget.order.discount.toStringAsFixed(0)}',
               color: AppColors.dairyGreen700,
             ),
           const Divider(height: 16),
           _totalRow(
             locale.t('grand_total'),
-            '₹${order.total.toStringAsFixed(order.total % 1 == 0 ? 0 : 2)}',
+            '₹${widget.order.total.toStringAsFixed(widget.order.total % 1 == 0 ? 0 : 2)}',
             bold: true,
             color: AppColors.milkBlue700,
           ),
           const SizedBox(height: 8),
           _totalRow(
-            'Payment Method',
-            order.paymentMethod.toUpperCase(),
+            locale.t('payment_method'),
+            locale.translatePaymentMethod(widget.order.paymentMethod).toUpperCase(),
             color: AppColors.ink700,
           ),
           _totalRow(
-            'Payment Status',
-            order.paymentStatus,
+            locale.t('payment_status'),
+            locale.translateStatus(widget.order.paymentStatus),
             bold: true,
-            color: order.paymentStatus.toLowerCase() == 'paid'
-                ? AppColors.dairyGreen700
-                : AppColors.red600,
+            color: isPaid ? AppColors.dairyGreen700 : AppColors.red600,
           ),
         ],
       ),
@@ -325,7 +410,7 @@ class ShopOrderDetailScreen extends StatelessWidget {
   }
 
   Widget _buildTimeline(LocaleState locale) {
-    final status = order.status.toLowerCase();
+    final status = widget.order.status.toLowerCase();
 
     final isConfirmed = status == 'confirmed' ||
         status == 'prepared' ||
@@ -368,8 +453,10 @@ class ShopOrderDetailScreen extends StatelessWidget {
                     color: AppColors.red100,
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: Text('Cancelled',
-                      style: AppTextStyles.captionBold.copyWith(color: AppColors.red600)),
+                  child: Text(
+                    locale.t('order_cancelled'),
+                    style: AppTextStyles.captionBold.copyWith(color: AppColors.red600),
+                  ),
                 ),
             ],
           ),
@@ -430,6 +517,86 @@ class ShopOrderDetailScreen extends StatelessWidget {
               ],
             );
           }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInvoiceActions(BuildContext context, LocaleState locale) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(locale.t('nav_bills'), style: AppTextStyles.h4),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => PdfReceiptService.previewReceipt(
+                    context: context,
+                    order: widget.order,
+                    distributorInfo: _distributorInfo,
+                  ),
+                  icon: const Icon(Icons.visibility_outlined, size: 18),
+                  label: Text(locale.t('view')),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.milkBlue600,
+                    side: const BorderSide(color: AppColors.milkBlue600),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => PdfReceiptService.printReceipt(
+                    order: widget.order,
+                    distributorInfo: _distributorInfo,
+                  ),
+                  icon: const Icon(Icons.print_outlined, size: 18),
+                  label: Text(locale.t('print')),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.ink700,
+                    side: const BorderSide(color: AppColors.border),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => PdfReceiptService.shareReceipt(
+                    order: widget.order,
+                    distributorInfo: _distributorInfo,
+                  ),
+                  icon: const Icon(Icons.share_outlined, size: 18),
+                  label: Text(locale.t('share')),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.ink700,
+                    side: const BorderSide(color: AppColors.border),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

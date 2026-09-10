@@ -147,9 +147,9 @@ class _StatementScreenState extends State<StatementScreen> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Row(
         children: [
-          Expanded(child: _dateField(locale.t('from_date'), _fromDate, () {})),
+          Expanded(child: _dateField(locale.t('from_date'), locale.translateDate(_fromDate), () {})),
           const SizedBox(width: 10),
-          Expanded(child: _dateField(locale.t('to_date'), _toDate, () {})),
+          Expanded(child: _dateField(locale.t('to_date'), locale.translateDate(_toDate), () {})),
           const SizedBox(width: 10),
           GestureDetector(
             onTap: () {},
@@ -279,7 +279,7 @@ class _StatementScreenState extends State<StatementScreen> {
                     Expanded(
                       flex: 2,
                       child: Text(
-                        '${e.date.split(' ')[0]}\n${e.date.split(' ')[1]}',
+                        locale.translateDate(e.date).replaceAll(' ', '\n'),
                         style: AppTextStyles.overline,
                       ),
                     ),
@@ -289,7 +289,7 @@ class _StatementScreenState extends State<StatementScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            e.description,
+                            locale.translateStatementDesc(e.description),
                             style: AppTextStyles.caption,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,

@@ -4,7 +4,6 @@ import '../../core/colors.dart';
 import '../../core/text_styles.dart';
 import '../../data/mock_data.dart';
 import '../../services/order_service.dart';
-import '../../state/auth_state.dart';
 import '../../state/locale_state.dart';
 import '../../widgets/app_badge.dart';
 import '../shop/shop_order_detail_screen.dart';
@@ -383,10 +382,13 @@ class _OrderHistoryTab extends StatelessWidget {
           itemBuilder: (_, i) {
             final o = orders[i];
             final productsSummary = o.products.isNotEmpty
-                ? o.products.join(', ')
+                ? o.products.map((p) => locale.translateProduct(p)).join(', ')
                 : (o.items.isNotEmpty
-                    ? o.items.map((it) => '${it.name} × ${it.quantity}').join(', ')
-                    : 'Order Items');
+                    ? o.items
+                        .map((it) =>
+                            '${locale.translateProduct(it.name)} × ${it.quantity}')
+                        .join(', ')
+                    : locale.t('order_details'));
 
             return GestureDetector(
               onTap: () => Navigator.of(context).push(
@@ -432,13 +434,13 @@ class _OrderHistoryTab extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             AppBadge(
-                              label: o.orderStatus,
+                              label: locale.translateStatus(o.orderStatus),
                               variant: orderStatusVariant(o.orderStatus),
                               showDot: false,
                             ),
                             const SizedBox(width: 4),
                             AppBadge(
-                              label: o.paymentStatus,
+                              label: locale.translateStatus(o.paymentStatus),
                               variant: paymentStatusVariant(o.paymentStatus),
                               showDot: false,
                             ),
@@ -500,7 +502,7 @@ class _PaymentHistoryTab extends StatelessWidget {
                   children: [
                     Text(p.invoiceNo, style: AppTextStyles.captionBold),
                     Text(
-                      '${p.method} • ${p.date}',
+                      '${locale.translatePaymentMethod(p.method)} • ${locale.translateDate(p.date)}',
                       style: AppTextStyles.caption,
                     ),
                   ],
@@ -516,7 +518,7 @@ class _PaymentHistoryTab extends StatelessWidget {
                     ),
                   ),
                   AppBadge(
-                    label: p.status,
+                    label: locale.translateStatus(p.status),
                     variant: paymentStatusVariant(p.status),
                     showDot: false,
                   ),

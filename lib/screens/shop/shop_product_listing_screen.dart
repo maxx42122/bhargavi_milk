@@ -168,7 +168,7 @@ class _ShopProductListingScreenState extends State<ShopProductListingScreen> {
                             ),
                           ),
                           child: Text(
-                            cat,
+                            locale.translateCategory(cat),
                             style: AppTextStyles.captionBold.copyWith(
                               color: active ? Colors.white : AppColors.ink700,
                             ),
@@ -213,7 +213,7 @@ class _ShopProductListingScreenState extends State<ShopProductListingScreen> {
                               ),
                               const SizedBox(height: 10),
                               Text(
-                                'No matching products',
+                                locale.t('no_matching_products'),
                                 style: AppTextStyles.bodyBold,
                               ),
                               const SizedBox(height: 6),
@@ -224,7 +224,7 @@ class _ShopProductListingScreenState extends State<ShopProductListingScreen> {
                                     _category = 'All';
                                   });
                                 },
-                                child: const Text('Reset filter'),
+                                child: Text(locale.t('reset_filter')),
                               ),
                             ],
                           ),
@@ -387,13 +387,13 @@ class _ProductListRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  product.name,
+                  locale.translateProduct(product.name),
                   style: AppTextStyles.bodyBold,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  '${product.packSize} • ${product.unit}',
+                  '${product.packSize} • ${locale.translateUnit(product.unit)}',
                   style: AppTextStyles.caption.copyWith(
                     color: AppColors.ink500,
                   ),
@@ -418,7 +418,7 @@ class _ProductListRow extends StatelessWidget {
                         isOutOfStock
                             ? locale.t('out_of_stock')
                             : (product.stock <= 10
-                                  ? '${product.stock} left'
+                                  ? '${product.stock} ${locale.t('units_left')}'
                                   : locale.t('in_stock')),
                         style: AppTextStyles.overline.copyWith(
                           color: isOutOfStock

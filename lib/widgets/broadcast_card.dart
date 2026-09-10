@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../core/colors.dart';
 import '../core/text_styles.dart';
@@ -19,6 +20,7 @@ class _DistributorBroadcastCardState extends State<DistributorBroadcastCard> {
   String _selectedTag = 'Notice';
   bool _isSubmitting = false;
   bool _showComposer = true;
+  Timer? _tickerTimer;
 
   final List<(String, String, IconData, Color)> _tags = [
     ('Notice', '📢 Notice', Icons.campaign_rounded, AppColors.milkBlue600),
@@ -37,7 +39,17 @@ class _DistributorBroadcastCardState extends State<DistributorBroadcastCard> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // Periodic ticker to refresh the expiration countdown every 30 seconds
+    _tickerTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
   void dispose() {
+    _tickerTimer?.cancel();
     _messageController.dispose();
     _titleController.dispose();
     super.dispose();
@@ -76,7 +88,7 @@ class _DistributorBroadcastCardState extends State<DistributorBroadcastCard> {
               children: [
                 const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
                 const SizedBox(width: 10),
-                Expanded(child: Text(locale.t('broadcast_sent'))),
+                Expanded(child: Text(locale.t('broadcast_sent_24h'))),
               ],
             ),
             backgroundColor: AppColors.dairyGreen600,
@@ -192,13 +204,14 @@ class _DistributorBroadcastCardState extends State<DistributorBroadcastCard> {
         final currentBroadcast = snapshot.data;
         final hasActiveBroadcast = currentBroadcast != null &&
             currentBroadcast.active &&
-            currentBroadcast.message.isNotEmpty;
+            currentBroadcast.message.isNotEmpty &&
+            !currentBroadcast.isExpired;
 
         return Container(
           margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           decoration: BoxDecoration(
             color: AppColors.cardSurface,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppColors.cardRadius),
             border: Border.all(
               color: hasActiveBroadcast
                   ? AppColors.milkBlue300
@@ -256,8 +269,8 @@ class _DistributorBroadcastCardState extends State<DistributorBroadcastCard> {
                           const SizedBox(height: 2),
                           Text(
                             hasActiveBroadcast
-                                ? 'Broadcast is live on all shop dashboards'
-                                : 'Send instant message or notice to all shops',
+                                ? locale.t('broadcast_active_24h')
+                                : locale.t('broadcast_idle_24h'),
                             style: AppTextStyles.caption.copyWith(
                               color: hasActiveBroadcast
                                   ? AppColors.dairyGreen700
@@ -270,40 +283,78 @@ class _DistributorBroadcastCardState extends State<DistributorBroadcastCard> {
                         ],
                       ),
                     ),
-                    if (hasActiveBroadcast)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.dairyGreen100,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppColors.dairyGreen300),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 7,
-                              height: 7,
-                              decoration: const BoxDecoration(
-                                color: AppColors.dairyGreen600,
-                                shape: BoxShape.circle,
-                              ),
+                    if (hasActiveBroadcast) ...[
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 3,
                             ),
-                            const SizedBox(width: 5),
-                            Text(
-                              'LIVE',
-                              style: AppTextStyles.overline.copyWith(
-                                color: AppColors.dairyGreen700,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.5,
-                              ),
+                            decoration: BoxDecoration(
+                              color: AppColors.dairyGreen100,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: AppColors.dairyGreen300),
                             ),
-                          ],
-                        ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.dairyGreen600,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'LIVE',
+                                  style: AppTextStyles.overline.copyWith(
+                                    color: AppColors.dairyGreen700,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.5,
+                                    fontSize: 9,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.amber100,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: AppColors.amber500.withValues(alpha: 0.5)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.timer_outlined,
+                                  size: 11,
+                                  color: AppColors.amber700,
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  currentBroadcast.timeRemainingFormatted,
+                                  style: AppTextStyles.overline.copyWith(
+                                    color: AppColors.amber700,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 9,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
+                    ],
                   ],
                 ),
               ),
@@ -337,7 +388,7 @@ class _DistributorBroadcastCardState extends State<DistributorBroadcastCard> {
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
-                              currentBroadcast.tag.toUpperCase(),
+                              locale.translateBroadcastTag(currentBroadcast.tag).toUpperCase(),
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 10,
@@ -382,15 +433,26 @@ class _DistributorBroadcastCardState extends State<DistributorBroadcastCard> {
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Visible to all connected shops',
-                            style: AppTextStyles.overline.copyWith(
-                              color: AppColors.ink500,
-                            ),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.schedule_rounded,
+                                size: 12,
+                                color: AppColors.ink500,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${locale.t('broadcast_expires_in')}: ${currentBroadcast.timeRemainingFormatted}',
+                                style: AppTextStyles.overline.copyWith(
+                                  color: AppColors.ink600,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                           InkWell(
                             onTap: () {
@@ -461,7 +523,7 @@ class _DistributorBroadcastCardState extends State<DistributorBroadcastCard> {
                                       color: isSelected ? Colors.white : t.$4,
                                     ),
                                     const SizedBox(width: 5),
-                                    Text(t.$2),
+                                    Text(locale.translateBroadcastTag(t.$1)),
                                   ],
                                 ),
                                 selected: isSelected,
@@ -552,7 +614,7 @@ class _DistributorBroadcastCardState extends State<DistributorBroadcastCard> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
-                                        tpl.$1,
+                                        locale.translateData(tpl.$1),
                                         style: const TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w600,
@@ -568,7 +630,38 @@ class _DistributorBroadcastCardState extends State<DistributorBroadcastCard> {
                         ),
                       ),
 
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 12),
+
+                      // Auto-expire 24h notice
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: AppColors.milkBlue50.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.milkBlue200),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.auto_delete_outlined,
+                              size: 14,
+                              color: AppColors.milkBlue700,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                locale.t('broadcast_auto_24h_notice'),
+                                style: AppTextStyles.overline.copyWith(
+                                  color: AppColors.milkBlue800,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
 
                       // Submit Button
                       SizedBox(

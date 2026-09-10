@@ -28,12 +28,18 @@ service cloud.firestore {
       );
     }
 
-    // Check whether the shop is approved.
+    // Check whether the shop is approved / active.
     function isApprovedShop(distributorId, shopId) {
-      return shopExists(distributorId, shopId)
+      return (
+        shopExists(distributorId, shopId)
         && get(
           /databases/$(database)/documents/distributor/$(distributorId)/shops/$(shopId)
-        ).data.status == 'approved';
+        ).data.status in ['active', 'approved']
+      ) || (
+        exists(/databases/$(database)/documents/shop_accounts/$(shopId))
+        && get(/databases/$(database)/documents/shop_accounts/$(shopId)).data.distributorId == distributorId
+        && get(/databases/$(database)/documents/shop_accounts/$(shopId)).data.status in ['active', 'approved']
+      );
     }
 
 
@@ -140,11 +146,7 @@ service cloud.firestore {
               'role',
               'distributorId',
               'uid',
-              'shopId',
-              'totalOrders',
-              'totalPurchase',
-              'paidAmount',
-              'outstanding'
+              'shopId'
             ])
           );
 
@@ -157,6 +159,12 @@ service cloud.firestore {
         //
         allow delete:
           if isDistributor(distributorId);
+
+        // Subcollection for shop-specific payment reminders
+        match /payment_reminders/{reminderId} {
+          allow read, write:
+            if isAuthenticated();
+        }
       }
 
 
@@ -189,33 +197,28 @@ service cloud.firestore {
         // CREATE
         // --------------------------------------------------------
         //
-        // Only an APPROVED shop can create an order.
-        //
-        // Required:
-        //   shopId == authenticated UID
-        //   status == pending
+        // Authenticated shop can create order for itself
         //
         allow create:
           if isAuthenticated()
-          && request.resource.data.shopId == request.auth.uid
-          && request.resource.data.status == 'pending'
-          && isApprovedShop(
-               distributorId,
-               request.auth.uid
-             );
+          && request.resource.data.shopId == request.auth.uid;
 
 
         // --------------------------------------------------------
         // UPDATE
         // --------------------------------------------------------
         //
-        // Only distributor can update an order.
-        //
-        // This allows distributor to change:
-        //   pending, confirmed, prepared, delivered, rejected, completed
+        // Distributor can change status / record payments.
+        // Shop can update payment fields on their own orders.
         //
         allow update:
-          if isDistributor(distributorId);
+          if isAuthenticated()
+          &&
+          (
+            isDistributor(distributorId)
+            ||
+            resource.data.shopId == request.auth.uid
+          );
 
 
         // --------------------------------------------------------
@@ -240,50 +243,14 @@ service cloud.firestore {
         // --------------------------------------------------------
         // READ
         // --------------------------------------------------------
-        //
-        // Distributor can read their own broadcasts.
-        // Approved shops belonging to this distributor can read.
-        //
         allow read:
-          if isDistributor(distributorId)
-          ||
-          (
-            isAuthenticated()
-            && isApprovedShop(
-                 distributorId,
-                 request.auth.uid
-               )
-          );
-
+          if isAuthenticated();
 
         // --------------------------------------------------------
-        // CREATE
+        // WRITE
         // --------------------------------------------------------
-        //
-        // Only distributor can create broadcasts.
-        //
-        allow create:
-          if isDistributor(distributorId);
-
-
-        // --------------------------------------------------------
-        // UPDATE
-        // --------------------------------------------------------
-        //
-        // Only distributor can update broadcasts.
-        //
-        allow update:
-          if isDistributor(distributorId);
-
-
-        // --------------------------------------------------------
-        // DELETE
-        // --------------------------------------------------------
-        //
-        // Only distributor can delete broadcasts.
-        //
-        allow delete:
-          if isDistributor(distributorId);
+        allow create, update, delete:
+          if isAuthenticated();
       }
 
 
@@ -295,6 +262,55 @@ service cloud.firestore {
 
       match /broadcast_history/{historyId} {
         allow read, write:
+          if isAuthenticated();
+      }
+
+
+      // ==========================================================
+      // PAYMENT REMINDERS
+      //
+      // /distributor/{distributorId}/payment_reminders/{reminderId}
+      // ==========================================================
+
+      match /payment_reminders/{reminderId} {
+        allow read, write:
+          if isAuthenticated();
+      }
+
+      match /payment_reminders_history/{historyId} {
+        allow read, write:
+          if isAuthenticated();
+      }
+
+      // ==========================================================
+      // PAYMENTS
+      //
+      // /distributor/{distributorId}/payments/{paymentId}
+      // ==========================================================
+
+      match /payments/{paymentId} {
+        allow read:
+          if isAuthenticated()
+          && (
+            isDistributor(distributorId)
+            || resource.data.shopId == request.auth.uid
+          );
+
+        allow create:
+          if isAuthenticated()
+          && (
+            isDistributor(distributorId)
+            || request.resource.data.shopId == request.auth.uid
+          );
+
+        allow update:
+          if isAuthenticated()
+          && (
+            isDistributor(distributorId)
+            || resource.data.shopId == request.auth.uid
+          );
+
+        allow delete:
           if isDistributor(distributorId);
       }
     }
