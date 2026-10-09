@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/colors.dart';
 import '../../core/text_styles.dart';
 import '../../services/product_service.dart';
+import '../../services/distributor_settings_service.dart';
+import '../../state/auth_state.dart';
 import '../../state/locale_state.dart';
 import '../../widgets/app_search_bar.dart';
 import '../../widgets/empty_state.dart';
@@ -11,6 +13,7 @@ import '../../widgets/quantity_stepper.dart';
 
 // Make sure this path matches your project structure.
 import 'cart_screen.dart';
+import 'shop_payment_screen.dart';
 
 class ShopProductListingScreen extends StatefulWidget {
   final String distributorId;
@@ -178,6 +181,166 @@ class _ShopProductListingScreenState extends State<ShopProductListingScreen> {
                     );
                   }).toList(),
                 ),
+              ),
+
+              // ==========================================================
+              // ORDERING STATUS / RESTRICTION BAR
+              // ==========================================================
+              StreamBuilder<DistributorOrderSettings>(
+                stream: DistributorSettingsService.streamSettings(widget.distributorId),
+                builder: (context, settingsSnap) {
+                  final settings = settingsSnap.data ?? const DistributorOrderSettings();
+                  final auth = AuthStateScope.of(context);
+                  final eligibility = DistributorSettingsService.checkEligibility(
+                    shopProfile: auth.shopProfile,
+                    settings: settings,
+                  );
+
+                  if (eligibility.isTimeBlocked) {
+                    return Container(
+                      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: AppColors.amber50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.amber300),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.lock_clock_rounded, color: AppColors.amber800, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${locale.t("ordering_closed")}: ${settings.startTimeFormatted}–${settings.endTimeFormatted}',
+                              style: AppTextStyles.captionBold.copyWith(
+                                color: AppColors.amber900,
+                                fontSize: 11.5,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: AppColors.amber700,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'CLOSED',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  if (eligibility.isPaymentBlocked) {
+                    final formattedPending = eligibility.pendingAmount.toStringAsFixed(
+                      eligibility.pendingAmount % 1 == 0 ? 0 : 2,
+                    );
+
+                    return Container(
+                      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: AppColors.red50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.red300),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline_rounded, color: AppColors.red600, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Unpaid bills (₹$formattedPending). Clear dues to order.',
+                              style: AppTextStyles.captionBold.copyWith(
+                                color: AppColors.red800,
+                                fontSize: 11.5,
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ShopPaymentScreen(
+                                    amountDue: eligibility.pendingAmount,
+                                    distributorId: widget.distributorId,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.red600,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                locale.t('pay_now'),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  if (settings.orderTimingEnabled) {
+                    return Container(
+                      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.dairyGreen50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.dairyGreen300),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.schedule_rounded, color: AppColors.dairyGreen700, size: 15),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${locale.t("orders_accepted_between")} ${settings.startTimeFormatted} – ${settings.endTimeFormatted}',
+                              style: AppTextStyles.captionBold.copyWith(
+                                color: AppColors.dairyGreen800,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: AppColors.dairyGreen600,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'OPEN',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return const SizedBox.shrink();
+                },
               ),
 
               // ==========================================================

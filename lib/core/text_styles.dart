@@ -3,7 +3,24 @@ import 'package:google_fonts/google_fonts.dart';
 import 'colors.dart';
 
 class AppTextStyles {
-  // Headings — Figtree
+  // Display & Hero (For desktop headers & dashboards)
+  static TextStyle get displayLarge => GoogleFonts.plusJakartaSans(
+        fontSize: 40,
+        fontWeight: FontWeight.w800,
+        color: AppColors.ink900,
+        height: 1.15,
+        letterSpacing: -0.5,
+      );
+
+  static TextStyle get displayMedium => GoogleFonts.plusJakartaSans(
+        fontSize: 32,
+        fontWeight: FontWeight.w700,
+        color: AppColors.ink900,
+        height: 1.2,
+        letterSpacing: -0.3,
+      );
+
+  // Headings — Figtree / Plus Jakarta Sans
   static TextStyle get h1 => GoogleFonts.figtree(
         fontSize: 34,
         fontWeight: FontWeight.w700,
@@ -24,6 +41,29 @@ class AppTextStyles {
       );
   static TextStyle get h4 => GoogleFonts.figtree(
         fontSize: 17,
+        fontWeight: FontWeight.w600,
+        color: AppColors.ink900,
+        height: 1.35,
+      );
+
+  // Desktop Specific Headings
+  static TextStyle get desktopH1 => GoogleFonts.plusJakartaSans(
+        fontSize: 28,
+        fontWeight: FontWeight.w700,
+        color: AppColors.ink900,
+        height: 1.25,
+        letterSpacing: -0.2,
+      );
+
+  static TextStyle get desktopH2 => GoogleFonts.plusJakartaSans(
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
+        color: AppColors.ink900,
+        height: 1.3,
+      );
+
+  static TextStyle get desktopH3 => GoogleFonts.plusJakartaSans(
+        fontSize: 18,
         fontWeight: FontWeight.w600,
         color: AppColors.ink900,
         height: 1.35,
@@ -60,6 +100,19 @@ class AppTextStyles {
         color: AppColors.ink900,
         fontFeatures: const [FontFeature.tabularFigures()],
         height: 1.4,
+      );
+  static TextStyle get priceLarge => GoogleFonts.plusJakartaSans(
+        fontSize: 24,
+        fontWeight: FontWeight.w800,
+        color: AppColors.ink900,
+        fontFeatures: const [FontFeature.tabularFigures()],
+        letterSpacing: -0.2,
+      );
+  static TextStyle get priceMedium => GoogleFonts.plusJakartaSans(
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        color: AppColors.ink900,
+        fontFeatures: const [FontFeature.tabularFigures()],
       );
   static TextStyle get label => GoogleFonts.figtree(
         fontSize: 13,

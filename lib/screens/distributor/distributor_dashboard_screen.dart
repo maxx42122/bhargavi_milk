@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/colors.dart';
+import '../../core/responsive.dart';
 import '../../core/text_styles.dart';
 import '../../services/auth_service.dart';
 import '../../services/order_service.dart';
@@ -13,9 +14,11 @@ import '../../widgets/app_badge.dart';
 import '../../widgets/broadcast_card.dart';
 import '../../widgets/kpi_card.dart';
 import '../../widgets/language_picker.dart';
-import '../../widgets/bvh_logo_widget.dart';
+import '../../widgets/desktop/desktop_distributor_sidebar.dart';
+import '../../widgets/desktop/desktop_top_nav.dart';
+import '../../widgets/desktop/desktop_kpi_card.dart';
+import '../../widgets/desktop/desktop_hover_card.dart';
 import 'distributor_profile_screen.dart';
-import 'invoice_screen.dart';
 import 'notifications_screen.dart';
 import 'order_management_screen.dart';
 import 'payments_outstanding_screen.dart';
@@ -24,6 +27,8 @@ import 'reports_screen.dart';
 import 'shop_management_screen.dart';
 import 'statement_screen.dart';
 import 'total_orders_summary_screen.dart';
+import 'distributor_settings_screen.dart';
+import '../../services/distributor_settings_service.dart';
 
 class DistributorDashboardScreen extends StatefulWidget {
   const DistributorDashboardScreen({super.key});
@@ -48,7 +53,7 @@ class _DistributorDashboardScreenState
   @override
   Widget build(BuildContext context) {
     final locale = LocaleScope.of(context);
-    final isWide = MediaQuery.of(context).size.width > 700;
+    final isWide = context.isDesktop;
 
     final screens = [
       _DashboardContent(onNavigate: _navigateTo),
@@ -60,14 +65,17 @@ class _DistributorDashboardScreenState
 
     if (isWide) {
       return Scaffold(
+        backgroundColor: AppColors.background,
         body: Row(
           children: [
-            _DistributorSidebar(
+            DesktopDistributorSidebar(
               selectedIndex: _selectedIndex,
               onSelect: (i) => setState(() => _selectedIndex = i),
               locale: locale,
             ),
-            Expanded(child: screens[_selectedIndex]),
+            Expanded(
+              child: screens[_selectedIndex],
+            ),
           ],
         ),
       );
@@ -99,275 +107,6 @@ class _NavItem {
   final IconData icon;
   final String labelKey;
   const _NavItem(this.icon, this.labelKey);
-}
-
-// ── Sidebar (wide) ────────────────────────────────────────────────────────────
-
-class _DistributorSidebar extends StatelessWidget {
-  final int selectedIndex;
-  final ValueChanged<int> onSelect;
-  final LocaleState locale;
-
-  const _DistributorSidebar({
-    required this.selectedIndex,
-    required this.onSelect,
-    required this.locale,
-  });
-
-  static const _allItems = [
-    _NavItem(Icons.dashboard_rounded, 'nav_dashboard'),
-    _NavItem(Icons.receipt_long_rounded, 'nav_orders'),
-    _NavItem(Icons.inventory_2_rounded, 'nav_products'),
-    _NavItem(Icons.store_rounded, 'nav_customers'),
-    _NavItem(Icons.payments_rounded, 'nav_payments'),
-    _NavItem(Icons.description_rounded, 'nav_bills'),
-    _NavItem(Icons.account_balance_wallet_rounded, 'nav_statements'),
-    _NavItem(Icons.bar_chart_rounded, 'nav_reports'),
-    _NavItem(Icons.settings_rounded, 'nav_settings'),
-  ];
-
-  String _sidebarInitials() {
-    final name = AuthService.currentUser?.displayName ?? '';
-    if (name.isEmpty) return 'D';
-    return name
-        .trim()
-        .split(' ')
-        .map((w) => w.isNotEmpty ? w[0] : '')
-        .take(2)
-        .join()
-        .toUpperCase();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 240,
-      color: AppColors.milkBlue900,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Brand header
-          Container(
-            padding: EdgeInsets.fromLTRB(
-              20,
-              MediaQuery.of(context).padding.top + 20,
-              20,
-              20,
-            ),
-            decoration: const BoxDecoration(gradient: AppColors.headerGradient),
-            child: Row(
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.95),
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: const BvhLogoWidget(
-                    size: 30,
-                    showCard: false,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  locale.t('app_name'),
-                  style: AppTextStyles.h4.copyWith(color: Colors.white),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Nav items
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              itemCount: _allItems.length,
-              itemBuilder: (_, i) {
-                final item = _allItems[i];
-                final active = i == selectedIndex && i < 5;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(10),
-                    onTap: () {
-                      if (i < 5) {
-                        onSelect(i);
-                      } else {
-                        // Navigate to standalone screens
-                        final screens = [
-                          const InvoiceScreen(),
-                          const StatementScreen(shopName: 'All Shops'),
-                          const ReportsScreen(),
-                          const Scaffold(body: Center(child: Text('Settings'))),
-                        ];
-                        if (i - 5 < screens.length) {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => screens[i - 5]),
-                          );
-                        }
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 11,
-                      ),
-                      decoration: BoxDecoration(
-                        color: active
-                            ? AppColors.milkBlue600
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            item.icon,
-                            color: active ? Colors.white : Colors.white60,
-                            size: 19,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            locale.t(item.labelKey),
-                            style: AppTextStyles.label.copyWith(
-                              color: active ? Colors.white : Colors.white70,
-                              fontWeight: active
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          // Bottom profile & logout
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const DistributorProfileScreen(),
-                    ),
-                  ),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                AppColors.milkBlue500,
-                                AppColors.milkBlue700,
-                              ],
-                            ),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Text(
-                              _sidebarInitials(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                AuthService.currentUser?.displayName ??
-                                    locale.t('nav_profile'),
-                                style: AppTextStyles.captionBold.copyWith(
-                                  color: Colors.white,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                locale.t('nav_profile'),
-                                style: AppTextStyles.overline.copyWith(
-                                  color: Colors.white54,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Icon(
-                          Icons.chevron_right,
-                          color: Colors.white38,
-                          size: 16,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Divider(color: Colors.white12, height: 1),
-                const SizedBox(height: 10),
-                const LanguagePillButton(),
-                const SizedBox(height: 12),
-                InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: () async => AuthService.signOut(),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.logout,
-                          color: Colors.white54,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          locale.t('logout'),
-                          style: AppTextStyles.label.copyWith(
-                            color: Colors.white54,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 // ── Top Product Model Helper ──────────────────────────────────────────────────
@@ -590,11 +329,45 @@ class _DashboardContent extends StatelessWidget {
           final topProductsList = productSalesMap.values.toList()
             ..sort((a, b) => b.quantitySold.compareTo(a.quantitySold));
 
+          if (context.isDesktop) {
+            return _buildDesktopDashboardView(
+              context: context,
+              locale: locale,
+              distributorId: distributorId,
+              allOrders: allOrders,
+              isOrdersLoading: isOrdersLoading,
+              todaysOrdersCount: todaysOrdersCount,
+              orderDeltaStr: orderDeltaStr,
+              orderDeltaPositive: orderDeltaCount >= 0,
+              todaysSales: todaysSales,
+              salesDeltaStr: salesDeltaStr,
+              salesDeltaPositive: salesDeltaPercent >= 0,
+              totalCollected: totalCollected,
+              totalPending: totalPending,
+              totalOverdue: totalOverdue,
+              pendingOrdersCount: pendingOrdersCount,
+              last7DaysSales: last7DaysSales,
+              maxSalesIn7Days: maxSalesIn7Days,
+              topProductsList: topProductsList,
+              numberFormat: numberFormat,
+              onNavigate: onNavigate,
+            );
+          }
+
           return CustomScrollView(
             slivers: [
               // Top Bar
               SliverToBoxAdapter(
                 child: _buildTopBar(context, locale, distributorId),
+              ),
+
+              // Store Order Timing & Payment Rules Banner
+              SliverToBoxAdapter(
+                child: _DistributorOrderTimingBanner(
+                  distributorId: distributorId,
+                  locale: locale,
+                  onNavigate: onNavigate,
+                ),
               ),
 
               // Broadcast to all shops
@@ -782,6 +555,584 @@ class _DashboardContent extends StatelessWidget {
     );
   }
 
+  Widget _buildDesktopDashboardView({
+    required BuildContext context,
+    required LocaleState locale,
+    required String distributorId,
+    required List<OrderModel> allOrders,
+    required bool isOrdersLoading,
+    required int todaysOrdersCount,
+    required String orderDeltaStr,
+    required bool orderDeltaPositive,
+    required double todaysSales,
+    required String salesDeltaStr,
+    required bool salesDeltaPositive,
+    required double totalCollected,
+    required double totalPending,
+    required double totalOverdue,
+    required int pendingOrdersCount,
+    required List<Map<String, dynamic>> last7DaysSales,
+    required double maxSalesIn7Days,
+    required List<_TopProductStat> topProductsList,
+    required NumberFormat numberFormat,
+    required void Function(Widget) onNavigate,
+  }) {
+    final user = AuthService.currentUser;
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: distributorId.isNotEmpty
+          ? AuthService.distributorStream(distributorId)
+          : null,
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data() ?? {};
+        final companyName = (data['companyName'] ??
+                data['name'] ??
+                user?.displayName ??
+                'MilkRoute Distributor')
+            .toString();
+
+        return Column(
+          children: [
+            // Desktop Top Nav Bar
+            DesktopTopNav(
+              title: companyName,
+              subtitle: 'Morning Procurement & Route Dispatch Center',
+              showLiveBadge: true,
+              unreadNotifications: 0,
+              onNotificationTap: () => onNavigate(const NotificationsScreen()),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.tune_rounded, color: AppColors.ink700, size: 20),
+                  tooltip: locale.t('order_settings'),
+                  onPressed: () => onNavigate(const DistributorSettingsScreen()),
+                ),
+              ],
+              trailingCustom: GestureDetector(
+                onTap: () => onNavigate(const DistributorProfileScreen()),
+                child: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: AppColors.milkBlue600,
+                  child: Text(
+                    companyName.isNotEmpty ? companyName[0].toUpperCase() : 'D',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // Scrollable Content
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+                child: DesktopMaxContainer(
+                  padding: EdgeInsets.zero,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Row 1: Timing rules & Broadcast
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 5,
+                            child: _DistributorOrderTimingBanner(
+                              distributorId: distributorId,
+                              locale: locale,
+                              onNavigate: onNavigate,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          const Expanded(
+                            flex: 5,
+                            child: DistributorBroadcastCard(),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Row 2: 4-Card Responsive KPI Metrics
+                      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                        stream: FirebaseFirestore.instance
+                            .collection('distributor')
+                            .doc(distributorId)
+                            .collection('shops')
+                            .snapshots(),
+                        builder: (context, shopsSnap) {
+                          final shopsDocs = shopsSnap.data?.docs ?? [];
+                          final totalShops = shopsDocs.length;
+                          final pendingShops = shopsDocs
+                              .where((d) => (d.data()['status'] ?? '') == 'pending')
+                              .length;
+                          final activeShops = shopsDocs
+                              .where((d) => (d.data()['status'] ?? '') == 'active')
+                              .length;
+
+                          final shopsDelta = pendingShops > 0
+                              ? '+$pendingShops Pending Approval'
+                              : '$activeShops Active';
+
+                          return Row(
+                            children: [
+                              // KPI 1: Today's Sales
+                              Expanded(
+                                child: DesktopKpiCard(
+                                  title: locale.t('todays_sales'),
+                                  value: '₹${numberFormat.format(todaysSales)}',
+                                  icon: Icons.trending_up_rounded,
+                                  iconColor: AppColors.primaryBlue,
+                                  iconBg: AppColors.milkBlue50,
+                                  deltaText: salesDeltaStr,
+                                  deltaPositive: salesDeltaPositive,
+                                  subtitle: 'Based on today\'s confirmed orders',
+                                  onTap: () => onNavigate(
+                                    const TotalOrdersSummaryScreen(initialDateFilter: 'Today'),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+
+                              // KPI 2: Today's Orders
+                              Expanded(
+                                child: DesktopKpiCard(
+                                  title: locale.t('todays_orders'),
+                                  value: '$todaysOrdersCount Orders',
+                                  icon: Icons.receipt_long_rounded,
+                                  iconColor: AppColors.dairyGreen600,
+                                  iconBg: AppColors.dairyGreen50,
+                                  deltaText: orderDeltaStr,
+                                  deltaPositive: orderDeltaPositive,
+                                  subtitle: 'Morning delivery batches',
+                                  onTap: () => onNavigate(
+                                    const TotalOrdersSummaryScreen(initialDateFilter: 'Today'),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+
+                              // KPI 3: Outstanding Ledger
+                              Expanded(
+                                child: DesktopKpiCard(
+                                  title: locale.t('outstanding_amount'),
+                                  value: '₹${numberFormat.format(totalPending)}',
+                                  icon: Icons.account_balance_wallet_rounded,
+                                  iconColor: totalOverdue > 0 ? AppColors.red600 : AppColors.amber600,
+                                  iconBg: totalOverdue > 0 ? AppColors.red50 : AppColors.amber50,
+                                  deltaText: totalOverdue > 0
+                                      ? '₹${numberFormat.format(totalOverdue)} overdue'
+                                      : '$pendingOrdersCount pending',
+                                  deltaPositive: totalOverdue == 0,
+                                  subtitle: 'Total shop receivables',
+                                  onTap: () => onNavigate(const PaymentsOutstandingScreen()),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+
+                              // KPI 4: Retail Customer Shops
+                              Expanded(
+                                child: DesktopKpiCard(
+                                  title: locale.t('total_shops'),
+                                  value: '$totalShops Shops',
+                                  icon: Icons.storefront_rounded,
+                                  iconColor: const Color(0xFF7C3AED),
+                                  iconBg: const Color(0xFFF3E8FF),
+                                  deltaText: shopsDelta,
+                                  deltaPositive: pendingShops == 0,
+                                  subtitle: '$activeShops verified vendors',
+                                  onTap: () => onNavigate(const ShopManagementScreen()),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Row 3: 2-Column Split (Live Orders & Top Products on Left, Sales Chart & Financials on Right)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Left 58% Column
+                          Expanded(
+                            flex: 58,
+                            child: Column(
+                              children: [
+                                // Live Orders Table
+                                DesktopHoverCard(
+                                  padding: const EdgeInsets.all(22),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(8),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.milkBlue50,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: const Icon(
+                                                  Icons.bolt_rounded,
+                                                  color: AppColors.primaryBlue,
+                                                  size: 20,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    locale.t('recent_orders'),
+                                                    style: AppTextStyles.desktopH3,
+                                                  ),
+                                                  Text(
+                                                    '${allOrders.length} total orders recorded',
+                                                    style: AppTextStyles.caption.copyWith(
+                                                      color: AppColors.ink500,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                          TextButton.icon(
+                                            onPressed: () => onNavigate(const OrderManagementScreen()),
+                                            icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                                            label: Text(locale.t('view_all')),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      const Divider(height: 1),
+                                      const SizedBox(height: 12),
+                                      _buildRealTimeOrdersTable(
+                                        orders: allOrders.take(6).toList(),
+                                        isLoading: isOrdersLoading,
+                                        numberFormat: numberFormat,
+                                        locale: locale,
+                                        onNavigate: onNavigate,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                const SizedBox(height: 24),
+
+                                // Top Selling Products Leaderboard
+                                DesktopHoverCard(
+                                  padding: const EdgeInsets.all(22),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(8),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.dairyGreen50,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: const Icon(
+                                                  Icons.leaderboard_rounded,
+                                                  color: AppColors.dairyGreen600,
+                                                  size: 20,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    locale.t('top_products'),
+                                                    style: AppTextStyles.desktopH3,
+                                                  ),
+                                                  Text(
+                                                    'Highest demand dairy items',
+                                                    style: AppTextStyles.caption.copyWith(
+                                                      color: AppColors.ink500,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                          TextButton.icon(
+                                            onPressed: () => onNavigate(
+                                              const TotalOrdersSummaryScreen(initialDateFilter: 'All Time'),
+                                            ),
+                                            icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                                            label: Text(locale.t('view_all')),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      const Divider(height: 1),
+                                      const SizedBox(height: 12),
+                                      _buildRealTimeTopProducts(
+                                        topProducts: topProductsList.take(5).toList(),
+                                        distributorId: distributorId,
+                                        numberFormat: numberFormat,
+                                        locale: locale,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(width: 24),
+
+                          // Right 42% Column
+                          Expanded(
+                            flex: 42,
+                            child: Column(
+                              children: [
+                                // 7-Day Real-Time Sales Bar Chart
+                                DesktopHoverCard(
+                                  padding: const EdgeInsets.all(22),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(8),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.amber50,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: const Icon(
+                                                  Icons.bar_chart_rounded,
+                                                  color: AppColors.amber600,
+                                                  size: 20,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    locale.t('sales_overview'),
+                                                    style: AppTextStyles.desktopH3,
+                                                  ),
+                                                  Text(
+                                                    locale.t('7_day_sales'),
+                                                    style: AppTextStyles.caption.copyWith(
+                                                      color: AppColors.ink500,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                          TextButton.icon(
+                                            onPressed: () => onNavigate(
+                                              const TotalOrdersSummaryScreen(initialDateFilter: 'This Week'),
+                                            ),
+                                            icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                                            label: Text(locale.t('view_all')),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      const Divider(height: 1),
+                                      const SizedBox(height: 16),
+                                      _buildRealTimeBarChart(
+                                        salesData: last7DaysSales,
+                                        maxVal: maxSalesIn7Days,
+                                        locale: locale,
+                                        numberFormat: numberFormat,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                const SizedBox(height: 24),
+
+                                // Payment Ledger & Recovery Matrix
+                                DesktopHoverCard(
+                                  padding: const EdgeInsets.all(22),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(8),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.milkBlue50,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: const Icon(
+                                                  Icons.payments_rounded,
+                                                  color: AppColors.primaryBlue,
+                                                  size: 20,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Text(
+                                                locale.t('payment_summary'),
+                                                style: AppTextStyles.desktopH3,
+                                              ),
+                                            ],
+                                          ),
+                                          TextButton.icon(
+                                            onPressed: () => onNavigate(const PaymentsOutstandingScreen()),
+                                            icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                                            label: Text(locale.t('view_all')),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      const Divider(height: 1),
+                                      const SizedBox(height: 16),
+                                      _buildRealTimePaymentSummary(
+                                        totalCollected: totalCollected,
+                                        totalPending: totalPending,
+                                        totalOverdue: totalOverdue,
+                                        numberFormat: numberFormat,
+                                        locale: locale,
+                                        onNavigate: onNavigate,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                const SizedBox(height: 24),
+
+                                // Operations Quick Action Grid
+                                DesktopHoverCard(
+                                  padding: const EdgeInsets.all(22),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Quick Operations Actions',
+                                        style: AppTextStyles.desktopH3,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        'Direct shortcuts to distributor management tools',
+                                        style: AppTextStyles.caption.copyWith(color: AppColors.ink500),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      const Divider(height: 1),
+                                      const SizedBox(height: 16),
+                                      Wrap(
+                                        spacing: 10,
+                                        runSpacing: 10,
+                                        children: [
+                                          _quickActionButton(
+                                            icon: Icons.table_chart_rounded,
+                                            label: 'Orders Matrix',
+                                            color: AppColors.primaryBlue,
+                                            onTap: () => onNavigate(const TotalOrdersSummaryScreen()),
+                                          ),
+                                          _quickActionButton(
+                                            icon: Icons.inventory_2_rounded,
+                                            label: 'Manage Products',
+                                            color: AppColors.dairyGreen600,
+                                            onTap: () => onNavigate(const ProductManagementScreen()),
+                                          ),
+                                          _quickActionButton(
+                                            icon: Icons.store_rounded,
+                                            label: 'Customer Shops',
+                                            color: const Color(0xFF7C3AED),
+                                            onTap: () => onNavigate(const ShopManagementScreen()),
+                                          ),
+                                          _quickActionButton(
+                                            icon: Icons.account_balance_wallet_rounded,
+                                            label: 'Customer Ledger',
+                                            color: AppColors.amber600,
+                                            onTap: () => onNavigate(const StatementScreen(shopName: 'All Shops')),
+                                          ),
+                                          _quickActionButton(
+                                            icon: Icons.bar_chart_rounded,
+                                            label: 'Sales Reports',
+                                            color: const Color(0xFF0284C7),
+                                            onTap: () => onNavigate(const ReportsScreen()),
+                                          ),
+                                          _quickActionButton(
+                                            icon: Icons.tune_rounded,
+                                            label: 'Cutoff Rules',
+                                            color: AppColors.ink700,
+                                            onTap: () => onNavigate(const DistributorSettingsScreen()),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 48),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _quickActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: AppTextStyles.captionBold.copyWith(color: color, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildTopBar(
     BuildContext context,
     LocaleState locale,
@@ -884,6 +1235,19 @@ class _DashboardContent extends StatelessWidget {
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => const NotificationsScreen(),
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(
+                  Icons.tune_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+                tooltip: locale.t('order_settings'),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const DistributorSettingsScreen(),
                   ),
                 ),
               ),
@@ -1695,3 +2059,142 @@ class _DashboardContent extends StatelessWidget {
     );
   }
 }
+
+class _DistributorOrderTimingBanner extends StatelessWidget {
+  final String distributorId;
+  final LocaleState locale;
+  final void Function(Widget) onNavigate;
+
+  const _DistributorOrderTimingBanner({
+    required this.distributorId,
+    required this.locale,
+    required this.onNavigate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (distributorId.isEmpty) return const SizedBox.shrink();
+
+    return StreamBuilder<DistributorOrderSettings>(
+      stream: DistributorSettingsService.streamSettings(distributorId),
+      builder: (context, snapshot) {
+        final settings = snapshot.data ?? const DistributorOrderSettings();
+        final status = DistributorSettingsService.isWithinOrderingHours(settings);
+        final isOpen = status.isOpen;
+
+        return Container(
+          margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isOpen
+                  ? AppColors.dairyGreen300
+                  : AppColors.amber300,
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: (isOpen ? AppColors.dairyGreen700 : AppColors.amber700)
+                    .withValues(alpha: 0.06),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: isOpen ? AppColors.dairyGreen50 : AppColors.amber50,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isOpen ? Icons.alarm_on_rounded : Icons.alarm_off_rounded,
+                  color: isOpen ? AppColors.dairyGreen700 : AppColors.amber800,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          locale.t('ordering_hours'),
+                          style: AppTextStyles.captionBold.copyWith(
+                            color: AppColors.ink900,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 1.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isOpen
+                                ? AppColors.dairyGreen600
+                                : AppColors.amber700,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            isOpen ? 'OPEN' : 'CLOSED',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      settings.orderTimingEnabled
+                          ? '${settings.startTimeFormatted} – ${settings.endTimeFormatted}${settings.blockOnPendingPayment ? " • Unpaid Block: Active" : ""}'
+                          : '24/7 Ordering Open (No time limit)',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.ink600,
+                        fontSize: 11,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  side: const BorderSide(color: AppColors.milkBlue500),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: () => onNavigate(const DistributorSettingsScreen()),
+                child: Text(
+                  locale.t('edit'),
+                  style: AppTextStyles.captionBold.copyWith(
+                    color: AppColors.milkBlue700,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+

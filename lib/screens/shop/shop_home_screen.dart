@@ -10,6 +10,7 @@ import '../../services/broadcast_service.dart';
 import '../../services/payment_reminder_service.dart';
 import '../../services/product_service.dart';
 import '../../services/shop_service.dart';
+import '../../services/distributor_settings_service.dart';
 import '../../state/auth_state.dart';
 import '../../state/locale_state.dart';
 import '../../widgets/app_search_bar.dart';
@@ -17,6 +18,11 @@ import '../../widgets/empty_state.dart';
 import '../../widgets/language_picker.dart';
 import '../../widgets/quantity_stepper.dart';
 import '../../widgets/bvh_logo_widget.dart';
+import '../../core/responsive.dart';
+import '../../widgets/desktop/desktop_shop_header.dart';
+import '../../widgets/desktop/desktop_product_card.dart';
+import '../../widgets/desktop/desktop_hover_card.dart';
+import 'checkout_screen.dart';
 import '../auth/login_screen.dart';
 import 'cart_screen.dart';
 import 'shop_order_history_screen.dart';
@@ -136,6 +142,15 @@ class _ShopHomeScreenState extends State<ShopHomeScreen> {
     }).toList();
   }
 
+  double _computeCartTotal(List<Product> products) {
+    double total = 0;
+    for (final p in products) {
+      final q = _cart[p.id] ?? 0;
+      if (q > 0) total += p.price * q;
+    }
+    return total;
+  }
+
   @override
   Widget build(BuildContext context) {
     final locale = LocaleScope.of(context);
@@ -165,6 +180,87 @@ class _ShopHomeScreenState extends State<ShopHomeScreen> {
           });
         }
 
+        // Desktop SaaS E-commerce Layout
+        if (context.isDesktop) {
+          return StreamBuilder<List<Product>>(
+            stream: ProductService.streamProducts(distributorId),
+            builder: (context, prodSnapshot) {
+              final allProducts = prodSnapshot.data ?? [];
+              final filteredProducts = _filterProducts(allProducts);
+              final isLoading =
+                  prodSnapshot.connectionState == ConnectionState.waiting &&
+                      !prodSnapshot.hasData;
+              final cartTotal = _computeCartTotal(allProducts);
+
+              return Scaffold(
+                backgroundColor: AppColors.background,
+                body: Column(
+                  children: [
+                    DesktopShopHeader(
+                      selectedNavIndex: _navIndex,
+                      onSelectNav: (i) => setState(() => _navIndex = i),
+                      selectedCategory: _category,
+                      onSelectCategory: (cat) => setState(() => _category = cat),
+                      categories: _categories,
+                      cartCount: _cartCount,
+                      cartTotal: cartTotal,
+                      searchQuery: _search,
+                      onSearchChanged: (v) => setState(() => _search = v),
+                      shopProfile: profile,
+                      onOpenCart: () => setState(() => _navIndex = 2),
+                    ),
+                    Expanded(
+                      child: _navIndex == 0
+                          ? _buildDesktopCatalog(
+                              context: context,
+                              locale: locale,
+                              distributorId: distributorId,
+                              shopUid: shopUid,
+                              profile: profile,
+                              allProducts: allProducts,
+                              filteredProducts: filteredProducts,
+                              isLoading: isLoading,
+                              cartTotal: cartTotal,
+                            )
+                          : DesktopMaxContainer(
+                              child: IndexedStack(
+                                index: _navIndex - 1,
+                                children: [
+                                  ShopProductListingScreen(
+                                    distributorId: distributorId,
+                                    cart: _cart,
+                                    onAdd: _addToCart,
+                                    onRemove: _removeFromCart,
+                                    onSetQuantity: _setCartQuantity,
+                                  ),
+                                  CartScreen(
+                                    distributorId: distributorId,
+                                    cart: _cart,
+                                    onAdd: _addToCart,
+                                    onRemove: _removeFromCart,
+                                    onSetQuantity: _setCartQuantity,
+                                    onClearCart: () => setState(() => _cart.clear()),
+                                  ),
+                                  ShopOrderHistoryScreen(
+                                    distributorId: distributorId,
+                                    shopUid: shopUid,
+                                  ),
+                                  ShopProfileScreen(
+                                    distributorId: distributorId,
+                                    shopUid: shopUid,
+                                  ),
+                                ],
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        }
+
+        // Mobile Layout (100% Intact and Unmodified)
         final pages = [
           _buildHome(context, locale, distributorId, shopUid, profile),
           ShopProductListingScreen(
@@ -259,6 +355,484 @@ class _ShopHomeScreenState extends State<ShopHomeScreen> {
     );
   }
 
+  Widget _buildDesktopCatalog({
+    required BuildContext context,
+    required LocaleState locale,
+    required String distributorId,
+    required String shopUid,
+    required ShopProfile? profile,
+    required List<Product> allProducts,
+    required List<Product> filteredProducts,
+    required bool isLoading,
+    required double cartTotal,
+  }) {
+    final cartProductsList = <(Product, int)>[];
+    for (final p in allProducts) {
+      final q = _cart[p.id] ?? 0;
+      if (q > 0) {
+        cartProductsList.add((p, q));
+      }
+    }
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final gridCols = screenWidth >= 1500 ? 4 : (screenWidth >= 1200 ? 3 : 2);
+
+    return DesktopMaxContainer(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Left: Catalog Grid & Banners ────────────────────────────
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildOrderEligibilityBanner(context, locale, distributorId, profile),
+                  _buildBroadcastBanner(context, locale, distributorId),
+                  _buildPaymentReminderBanner(context, locale, distributorId, shopUid),
+
+                  const SizedBox(height: 16),
+
+                  // Header Bar with category title & result count
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            _category == 'All'
+                                ? 'Fresh Dairy Supplies'
+                                : locale.translateCategory(_category),
+                            style: AppTextStyles.desktopH2.copyWith(
+                              color: AppColors.darkNavy,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.milkBlue50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.milkBlue200),
+                            ),
+                            child: Text(
+                              '${filteredProducts.length} ${locale.t("nav_products").toLowerCase()}',
+                              style: AppTextStyles.captionBold.copyWith(
+                                color: AppColors.primaryBlue,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (_search.isNotEmpty || _category != 'All')
+                        TextButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _search = '';
+                              _category = 'All';
+                            });
+                          },
+                          icon: const Icon(Icons.refresh_rounded, size: 16),
+                          label: Text(locale.t('reset_filter')),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.primaryBlue,
+                          ),
+                        ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Product Grid or Empty State
+                  if (isLoading)
+                    const SizedBox(
+                      height: 350,
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (allProducts.isEmpty)
+                    EmptyState(
+                      icon: Icons.inventory_2_outlined,
+                      title: locale.t('no_data'),
+                      subtitle: 'No products available from your distributor right now.',
+                    )
+                  else if (filteredProducts.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(40),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.search_off, size: 48, color: AppColors.ink300),
+                            const SizedBox(height: 12),
+                            Text(locale.t('no_matching_products'), style: AppTextStyles.h4),
+                            const SizedBox(height: 8),
+                            OutlinedButton(
+                              onPressed: () {
+                                setState(() {
+                                  _search = '';
+                                  _category = 'All';
+                                });
+                              },
+                              child: Text(locale.t('reset_filter')),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: gridCols,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: 0.82,
+                      ),
+                      itemCount: filteredProducts.length,
+                      itemBuilder: (context, index) {
+                        final p = filteredProducts[index];
+                        final qty = _cart[p.id] ?? 0;
+                        return DesktopProductCard(
+                          product: p,
+                          quantity: qty,
+                          onAdd: () => _addToCart(p.id),
+                          onRemove: () => _removeFromCart(p.id),
+                          onSetQuantity: (q) => _setCartQuantity(p.id, q),
+                        );
+                      },
+                    ),
+
+                  const SizedBox(height: 60),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 24),
+
+          // ── Right: Sticky Live Cart Summary Panel ────────────────────
+          SizedBox(
+            width: 380,
+            child: DesktopHoverCard(
+              borderRadius: 20,
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Title row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.milkBlue50,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.shopping_bag_outlined,
+                              color: AppColors.primaryBlue,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Order Summary',
+                            style: AppTextStyles.h4.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.darkNavy,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (_cartCount > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryBlue,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '$_cartCount items',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+
+                  const Divider(height: 24, color: AppColors.border),
+
+                  // Cart Items List
+                  if (_cartCount == 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 60,
+                            height: 60,
+                            decoration: const BoxDecoration(
+                              color: AppColors.milkBlue50,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.shopping_cart_outlined,
+                              size: 28,
+                              color: AppColors.milkBlue400,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            'Your cart is empty',
+                            style: AppTextStyles.bodyBold.copyWith(
+                              color: AppColors.ink800,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Add milk pouches, curd, and butter packs from the catalog to place your daily order.',
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.caption.copyWith(
+                              color: AppColors.ink500,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else ...[
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 280),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: cartProductsList.length,
+                        separatorBuilder: (_, _) => const Divider(
+                          height: 16,
+                          color: AppColors.borderLight,
+                        ),
+                        itemBuilder: (context, index) {
+                          final item = cartProductsList[index];
+                          final p = item.$1;
+                          final q = item.$2;
+                          final itemTotal = p.price * q;
+
+                          return Row(
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: AppColors.milkBlue50,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    p.emoji.isNotEmpty ? p.emoji : '🥛',
+                                    style: const TextStyle(fontSize: 18),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      p.name,
+                                      style: AppTextStyles.captionBold.copyWith(
+                                        color: AppColors.ink900,
+                                        fontSize: 13,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      '${p.packSize} • ₹${p.price.toStringAsFixed(0)} each',
+                                      style: AppTextStyles.caption.copyWith(
+                                        color: AppColors.ink500,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '₹${itemTotal.toStringAsFixed(0)}',
+                                    style: AppTextStyles.captionBold.copyWith(
+                                      color: AppColors.primaryBlue,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  QuantityStepper(
+                                    qty: q,
+                                    compact: true,
+                                    maxStock: p.stock > 0 ? p.stock : null,
+                                    productName: p.name,
+                                    onChanged: (newQty) => _setCartQuantity(p.id, newQty),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+
+                    const Divider(height: 24, color: AppColors.border),
+
+                    // Bill Breakdown
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Subtotal ($_cartCount items)',
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.ink600,
+                            fontSize: 13,
+                          ),
+                        ),
+                        Text(
+                          '₹${cartTotal.toStringAsFixed(0)}',
+                          style: AppTextStyles.bodyBold.copyWith(
+                            color: AppColors.ink800,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Delivery Charges',
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.ink600,
+                            fontSize: 13,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.dairyGreen50,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'FREE',
+                            style: TextStyle(
+                              color: AppColors.dairyGreen700,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const Divider(height: 20, color: AppColors.border),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Total Payable',
+                          style: AppTextStyles.h4.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.darkNavy,
+                          ),
+                        ),
+                        Text(
+                          '₹${cartTotal.toStringAsFixed(0)}',
+                          style: AppTextStyles.priceLarge.copyWith(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.primaryBlue,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    // Checkout CTA
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => CheckoutScreen(
+                                distributorId: distributorId,
+                                cartItems: cartProductsList,
+                                total: cartTotal,
+                                onOrderPlaced: () => setState(() => _cart.clear()),
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                        label: const Text(
+                          'Proceed to Checkout',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryBlue,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 3,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    Center(
+                      child: TextButton(
+                        onPressed: () => setState(() => _cart.clear()),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.red600,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        child: Text(
+                          'Clear Cart',
+                          style: AppTextStyles.captionBold.copyWith(
+                            color: AppColors.red600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHome(
     BuildContext context,
     LocaleState locale,
@@ -282,6 +856,9 @@ class _ShopHomeScreenState extends State<ShopHomeScreen> {
             slivers: [
               SliverToBoxAdapter(
                 child: _buildHeader(context, locale, profile),
+              ),
+              SliverToBoxAdapter(
+                child: _buildOrderEligibilityBanner(context, locale, distributorId, profile),
               ),
               SliverToBoxAdapter(
                 child: _buildBroadcastBanner(context, locale, distributorId),
@@ -533,6 +1110,285 @@ class _ShopHomeScreenState extends State<ShopHomeScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildOrderEligibilityBanner(
+    BuildContext context,
+    LocaleState locale,
+    String distributorId,
+    ShopProfile? profile,
+  ) {
+    if (distributorId.isEmpty) return const SizedBox.shrink();
+
+    return StreamBuilder<DistributorOrderSettings>(
+      stream: DistributorSettingsService.streamSettings(distributorId),
+      builder: (context, snapshot) {
+        final settings = snapshot.data ?? const DistributorOrderSettings();
+        final eligibility = DistributorSettingsService.checkEligibility(
+          shopProfile: profile,
+          settings: settings,
+        );
+
+        if (eligibility.canOrder) {
+          if (settings.orderTimingEnabled) {
+            return Container(
+              margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: AppColors.dairyGreen50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AppColors.dairyGreen300,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.schedule_rounded,
+                    color: AppColors.dairyGreen700,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${locale.t("orders_accepted_between")} ${settings.startTimeFormatted} – ${settings.endTimeFormatted}',
+                      style: AppTextStyles.captionBold.copyWith(
+                        color: AppColors.dairyGreen800,
+                        fontSize: 11.5,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: AppColors.dairyGreen600,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'OPEN',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+          return const SizedBox.shrink();
+        }
+
+        // 1. Time Blocked Banner
+        if (eligibility.isTimeBlocked) {
+          return Container(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.amber50,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.amber400, width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.amber600.withValues(alpha: 0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.amber600,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.lock_clock_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            locale.t('ordering_closed_banner').toUpperCase(),
+                            style: const TextStyle(
+                              color: AppColors.amber800,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.amber700,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'CLOSED',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        eligibility.statusMessage,
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.ink800,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        // 2. Pending Payment Blocked Banner
+        if (eligibility.isPaymentBlocked) {
+          final formattedPending = eligibility.pendingAmount.toStringAsFixed(
+            eligibility.pendingAmount % 1 == 0 ? 0 : 2,
+          );
+
+          return Container(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.red50,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.red400, width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.red600.withValues(alpha: 0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.red600,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.error_outline_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            locale.t('pending_payment_blocked_title').toUpperCase(),
+                            style: const TextStyle(
+                              color: AppColors.red700,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.red600,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'PAYMENT DUE',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Pending bill amount: ₹$formattedPending. Please clear dues to place new orders.',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.ink800,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.red600,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        icon: const Icon(Icons.payment_rounded, size: 16),
+                        label: Text(
+                          locale.t('pay_bills_now'),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                        ),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ShopPaymentScreen(
+                                amountDue: eligibility.pendingAmount,
+                                distributorId: distributorId,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return const SizedBox.shrink();
+      },
     );
   }
 

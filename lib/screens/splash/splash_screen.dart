@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'package:google_fonts/google_fonts.dart';
@@ -55,10 +56,10 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
   void initState() {
     super.initState();
 
-    // 1. Coordinated Master Entrance Timeline (2200ms)
+    // 1. Coordinated Master Entrance Timeline
     _mainController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2400),
+      duration: Duration(milliseconds: kIsWeb ? 1200 : 2400),
     );
 
     // 2. Ambient Continuous Loops
@@ -146,8 +147,9 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
   // ---------------------------------------------------------------------------
 
   Future<void> _startAppInitialization() async {
-    // 1. Minimum splash display duration for smooth animation experience
-    final timerFuture = Future.delayed(const Duration(milliseconds: 2300));
+    // 1. Splash display duration (fast & snappy on web, full cinematic on mobile)
+    final minDuration = kIsWeb ? 900 : 2200;
+    final timerFuture = Future.delayed(Duration(milliseconds: minDuration));
 
     // 2. Concurrently resolve Firebase Auth & Role
     final authFuture = _resolveAuth();
@@ -258,28 +260,30 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
             child: FadeTransition(
               opacity: _backdropOpacity,
               child: Center(
-                child: AnimatedBuilder(
-                  animation: _floatingController,
-                  builder: (context, _) {
-                    final offset = _floatingOffset.value;
-                    return Transform.translate(
-                      offset: Offset(0, offset * 1.8),
-                      child: Transform.scale(
-                        scale: 1.02 + (offset / 100.0),
-                        child: Opacity(
-                          opacity: 0.13, // Soft luminous watermark
-                          child: Image.asset(
-                            'assets/images/logo_v_3d.png',
-                            width: size.width * 0.88,
-                            height: size.width * 0.88,
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.high,
-                            errorBuilder: (ctx, err, stack) => const SizedBox(),
+                child: RepaintBoundary(
+                  child: AnimatedBuilder(
+                    animation: _floatingController,
+                    builder: (context, _) {
+                      final offset = _floatingOffset.value;
+                      return Transform.translate(
+                        offset: Offset(0, offset * 1.8),
+                        child: Transform.scale(
+                          scale: 1.02 + (offset / 100.0),
+                          child: Opacity(
+                            opacity: 0.13, // Soft luminous watermark
+                            child: Image.asset(
+                              'assets/images/logo_v_3d.png',
+                              width: size.width * 0.88,
+                              height: size.width * 0.88,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.high,
+                              errorBuilder: (ctx, err, stack) => const SizedBox(),
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               ),
             ),

@@ -134,12 +134,6 @@ class InvoiceScreen extends StatelessWidget {
                           color: Colors.white70,
                         ),
                       ),
-                      Text(
-                        'GST: 27ABCDE1234F1Z5',
-                        style: AppTextStyles.caption.copyWith(
-                          color: Colors.white70,
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -244,7 +238,10 @@ class InvoiceScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(locale.translateProduct(item.name), style: AppTextStyles.body),
+                        Text(
+                          locale.translateProduct(item.name),
+                          style: AppTextStyles.body,
+                        ),
                         Text(item.packSize, style: AppTextStyles.caption),
                       ],
                     ),

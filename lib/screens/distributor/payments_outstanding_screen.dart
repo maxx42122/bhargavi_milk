@@ -73,7 +73,8 @@ class _PaymentsOutstandingScreenState extends State<PaymentsOutstandingScreen> {
     if (pendingShopsCount == 0 || _isSendingReminder) return;
 
     final numberFormat = NumberFormat('#,##,##0', 'en_IN');
-    final distName = _distributorInfo?['companyName'] ??
+    final distName =
+        _distributorInfo?['companyName'] ??
         _distributorInfo?['distributorName'] ??
         AuthService.currentUser?.displayName ??
         'MilkRoute Distribution';
@@ -200,8 +201,10 @@ class _PaymentsOutstandingScreenState extends State<PaymentsOutstandingScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
               ),
               icon: const Icon(Icons.send_rounded, size: 16),
               label: Text(
@@ -259,7 +262,8 @@ class _PaymentsOutstandingScreenState extends State<PaymentsOutstandingScreen> {
     required LocaleState locale,
   }) async {
     final numberFormat = NumberFormat('#,##,##0', 'en_IN');
-    final distName = _distributorInfo?['companyName'] ??
+    final distName =
+        _distributorInfo?['companyName'] ??
         _distributorInfo?['distributorName'] ??
         AuthService.currentUser?.displayName ??
         'MilkRoute Distribution';
@@ -490,9 +494,8 @@ class _PaymentsOutstandingScreenState extends State<PaymentsOutstandingScreen> {
   Widget build(BuildContext context) {
     final locale = LocaleScope.of(context);
     final auth = AuthStateScope.of(context);
-    final distributorId = auth.distributorId ??
-        AuthService.currentUser?.uid ??
-        '';
+    final distributorId =
+        auth.distributorId ?? AuthService.currentUser?.uid ?? '';
 
     if (distributorId.isEmpty) {
       return Scaffold(
@@ -532,7 +535,8 @@ class _PaymentsOutstandingScreenState extends State<PaymentsOutstandingScreen> {
             final pStatus = order.paymentStatus.trim().toLowerCase();
             final oStatus = order.status.trim().toLowerCase();
             final isPaid = pStatus == 'paid' || oStatus == 'completed';
-            final isOverdue = pStatus == 'overdue' ||
+            final isOverdue =
+                pStatus == 'overdue' ||
                 (!isPaid &&
                     order.createdAt != null &&
                     order.createdAt!.isBefore(sevenDaysAgo));
@@ -560,8 +564,8 @@ class _PaymentsOutstandingScreenState extends State<PaymentsOutstandingScreen> {
                   shopName: order.shopName.isNotEmpty
                       ? order.shopName
                       : (order.shopOwner.isNotEmpty
-                          ? order.shopOwner
-                          : 'Customer'),
+                            ? order.shopOwner
+                            : 'Customer'),
                   shopOwner: order.shopOwner,
                   shopMobile: order.shopMobile,
                   deliveryAddress: order.deliveryAddress,
@@ -596,13 +600,13 @@ class _PaymentsOutstandingScreenState extends State<PaymentsOutstandingScreen> {
               GradientHeader(
                 title: locale.t('nav_payments'),
                 subtitle: locale.t('pending_payments'),
-                leading: IconButton(
-                  icon: const Icon(
-                    Icons.arrow_back_rounded,
-                    color: Colors.white,
-                  ),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
+                // leading: IconButton(
+                //   icon: const Icon(
+                //     Icons.arrow_back_rounded,
+                //     color: Colors.white,
+                //   ),
+                //   onPressed: () => Navigator.of(context).pop(),
+                // ),
               ),
               Expanded(
                 child: ListView(
@@ -631,7 +635,8 @@ class _PaymentsOutstandingScreenState extends State<PaymentsOutstandingScreen> {
                             width: 170,
                             child: KpiCard(
                               label: locale.t('todays_collection'),
-                              value: '₹${numberFormat.format(todaysCollection)}',
+                              value:
+                                  '₹${numberFormat.format(todaysCollection)}',
                               icon: Icons.today_rounded,
                               delta: 'Today',
                               deltaPositive: true,
@@ -736,16 +741,15 @@ class _PaymentsOutstandingScreenState extends State<PaymentsOutstandingScreen> {
                           ),
                           const SizedBox(width: 8),
                           ElevatedButton.icon(
-                            onPressed: (_isSendingReminder ||
-                                    pendingShopsList.isEmpty)
+                            onPressed:
+                                (_isSendingReminder || pendingShopsList.isEmpty)
                                 ? null
                                 : () => _handleSendReminderToAll(
-                                      distributorId: distributorId,
-                                      totalOutstanding: totalPending,
-                                      pendingShopsCount:
-                                          pendingShopsList.length,
-                                      locale: locale,
-                                    ),
+                                    distributorId: distributorId,
+                                    totalOutstanding: totalPending,
+                                    pendingShopsCount: pendingShopsList.length,
+                                    locale: locale,
+                                  ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
                               foregroundColor: AppColors.milkBlue900,
@@ -832,10 +836,10 @@ class _PaymentsOutstandingScreenState extends State<PaymentsOutstandingScreen> {
                             locale: locale,
                             onSendReminder: () =>
                                 _handleSendReminderToSingleShop(
-                              distributorId: distributorId,
-                              group: group,
-                              locale: locale,
-                            ),
+                                  distributorId: distributorId,
+                                  group: group,
+                                  locale: locale,
+                                ),
                             onRecordPayment: () => _handleRecordPayment(
                               distributorId: distributorId,
                               group: group,

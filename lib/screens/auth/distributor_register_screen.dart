@@ -118,207 +118,502 @@ class _DistributorRegisterScreenState extends State<DistributorRegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final locale = LocaleScope.of(context);
+    final isWide = MediaQuery.of(context).size.width >= 960;
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Column(
-        children: [
-          _buildHeader(context, locale),
+      body: isWide
+          ? _buildDesktopLayout(context, locale)
+          : _buildMobileLayout(context, locale),
+    );
+  }
 
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Form(
-                key: _formKey,
+  // ---------------------------------------------------------------------------
+  // DESKTOP LAYOUT
+  // ---------------------------------------------------------------------------
+
+  Widget _buildDesktopLayout(BuildContext context, LocaleState locale) {
+    return Row(
+      children: [
+        // Left Hero Panel
+        Expanded(
+          flex: 45,
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF09223D),
+                  Color(0xFF0F3D66),
+                  Color(0xFF003087),
+                  Color(0xFF0047FF),
+                ],
+              ),
+            ),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(48),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Error banner
-                    if (_error != null) _errorBanner(_error!),
-
-                    // Company Name
-                    _field(
-                      controller: _companyCtrl,
-                      label: locale.t('company_name'),
-                      hint: 'Bhargavi Distributors',
-                      icon: Icons.business_rounded,
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return locale.t('required');
-                        }
-                        return null;
-                      },
-                    ),
-
-                    // Distributor Name
-                    _field(
-                      controller: _nameCtrl,
-                      label: locale.t('distributor_name'),
-                      hint: 'Your full name',
-                      icon: Icons.person_outline,
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return locale.t('required');
-                        }
-                        return null;
-                      },
-                    ),
-
-                    // Address
-                    _field(
-                      controller: _addressCtrl,
-                      label: locale.t('address'),
-                      hint: '123, Dairy Road, Pune',
-                      icon: Icons.location_on_outlined,
-                      maxLines: 2,
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return locale.t('required');
-                        }
-                        return null;
-                      },
-                    ),
-
-                    // Mobile
-                    _field(
-                      controller: _mobileCtrl,
-                      label: locale.t('mobile_number'),
-                      hint: '9876543210',
-                      icon: Icons.phone_outlined,
-                      keyboardType: TextInputType.phone,
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return locale.t('required');
-                        }
-
-                        final mobile = v.trim();
-
-                        if (mobile.length < 10) {
-                          return locale.t('enter_valid_mobile');
-                        }
-
-                        return null;
-                      },
-                    ),
-
-                    // Email
-                    _field(
-                      controller: _emailCtrl,
-                      label: locale.t('email'),
-                      hint: 'distributor@email.com',
-                      icon: Icons.email_outlined,
-                      keyboardType: TextInputType.emailAddress,
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return locale.t('required');
-                        }
-
-                        final email = v.trim();
-
-                        if (!email.contains('@')) {
-                          return locale.t('enter_valid_email');
-                        }
-
-                        return null;
-                      },
-                    ),
-
-                    // Password
-                    _passwordField(
-                      controller: _passCtrl,
-                      label: locale.t('password'),
-                      obscure: _obscurePass,
-                      onToggle: () {
-                        setState(() {
-                          _obscurePass = !_obscurePass;
-                        });
-                      },
-                      validator: (v) {
-                        if (v == null || v.isEmpty) {
-                          return 'Required';
-                        }
-
-                        if (v.length < 6) {
-                          return 'Min 6 characters';
-                        }
-
-                        return null;
-                      },
-                    ),
-
-                    // Confirm Password
-                    _passwordField(
-                      controller: _confirmPassCtrl,
-                      label: locale.t('confirm_password'),
-                      obscure: _obscureConfirm,
-                      onToggle: () {
-                        setState(() {
-                          _obscureConfirm = !_obscureConfirm;
-                        });
-                      },
-                      validator: (v) {
-                        if (v == null || v.isEmpty) {
-                          return locale.t('required');
-                        }
-
-                        if (v != _passCtrl.text) {
-                          return locale.t('passwords_not_match');
-                        }
-
-                        return null;
-                      },
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    // Register Button
-                    SizedBox(
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: _loading ? null : _register,
-                        child: _loading
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2.5,
-                                ),
-                              )
-                            : Text(
-                                locale.t('register_as_distributor'),
-                                style: AppTextStyles.bodyBold.copyWith(
-                                  color: Colors.white,
-                                ),
-                              ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Login
-                    Center(
-                      child: TextButton(
-                        onPressed: _loading
-                            ? null
-                            : () => Navigator.pop(context),
-                        child: Text(
-                          locale.t('already_have_account'),
-                          style: AppTextStyles.captionBold.copyWith(
-                            color: AppColors.milkBlue600,
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back, color: Colors.white),
+                          onPressed: _loading ? null : () => Navigator.pop(context),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 44,
+                          height: 44,
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const BvhLogoWidget(size: 34, showCard: false),
+                        ),
+                        const SizedBox(width: 14),
+                        Text(
+                          locale.t('app_name'),
+                          style: AppTextStyles.h3.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
+                      ],
+                    ),
+                    const Spacer(),
+                    Text(
+                      'Partner with\nMilkRoute Enterprise',
+                      style: AppTextStyles.displayMedium.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
                       ),
                     ),
-
+                    const SizedBox(height: 14),
+                    Text(
+                      'Setup your distribution network in minutes. Connect shops, manage products, and streamline morning milk deliveries effortlessly.',
+                      style: AppTextStyles.body.copyWith(
+                        color: const Color(0xFFD4E6FA),
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 36),
+                    _heroStep(
+                      step: '1',
+                      title: 'Register Distributor Profile',
+                      desc: 'Enter your business information and dairy brand details.',
+                    ),
                     const SizedBox(height: 16),
+                    _heroStep(
+                      step: '2',
+                      title: 'Add Products & Catalog',
+                      desc: 'Define pack sizes, rates, and stock availability.',
+                    ),
+                    const SizedBox(height: 16),
+                    _heroStep(
+                      step: '3',
+                      title: 'Onboard Shops & Start Delivery',
+                      desc: 'Approve shop requests and receive automated morning orders.',
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.verified_user_outlined, color: Color(0xFF00E5FF)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Enterprise Grade Security • 100% Data Privacy Guaranteed',
+                              style: AppTextStyles.captionBold.copyWith(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
           ),
-        ],
-      ),
+        ),
+
+        // Right Form Panel
+        Expanded(
+          flex: 55,
+          child: Container(
+            color: const Color(0xFFF8FAFC),
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 40),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 620),
+                  child: Container(
+                    padding: const EdgeInsets.all(36),
+                    decoration: BoxDecoration(
+                      color: AppColors.cardSurface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.darkNavy.withValues(alpha: 0.05),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    locale.t('distributor_registration'),
+                                    style: AppTextStyles.h3,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    locale.t('create_distributor_account'),
+                                    style: AppTextStyles.caption.copyWith(
+                                      color: AppColors.ink500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const LanguagePillButton(),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          if (_error != null) _errorBanner(_error!),
+
+                          // 2-Column Grid for Form Fields
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _field(
+                                  controller: _companyCtrl,
+                                  label: locale.t('company_name'),
+                                  hint: 'Bhargavi Distributors',
+                                  icon: Icons.business_rounded,
+                                  validator: (v) => (v == null || v.trim().isEmpty) ? locale.t('required') : null,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _field(
+                                  controller: _nameCtrl,
+                                  label: locale.t('distributor_name'),
+                                  hint: 'Full Name',
+                                  icon: Icons.person_outline,
+                                  validator: (v) => (v == null || v.trim().isEmpty) ? locale.t('required') : null,
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _field(
+                                  controller: _mobileCtrl,
+                                  label: locale.t('mobile_number'),
+                                  hint: '9876543210',
+                                  icon: Icons.phone_outlined,
+                                  keyboardType: TextInputType.phone,
+                                  validator: (v) {
+                                    if (v == null || v.trim().isEmpty) return locale.t('required');
+                                    if (v.trim().length < 10) return locale.t('enter_valid_mobile');
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _field(
+                                  controller: _emailCtrl,
+                                  label: locale.t('email'),
+                                  hint: 'distributor@email.com',
+                                  icon: Icons.email_outlined,
+                                  keyboardType: TextInputType.emailAddress,
+                                  validator: (v) {
+                                    if (v == null || v.trim().isEmpty) return locale.t('required');
+                                    if (!v.contains('@')) return locale.t('enter_valid_email');
+                                    return null;
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          _field(
+                            controller: _addressCtrl,
+                            label: locale.t('address'),
+                            hint: '123, Dairy Road, Pune',
+                            icon: Icons.location_on_outlined,
+                            maxLines: 2,
+                            validator: (v) => (v == null || v.trim().isEmpty) ? locale.t('required') : null,
+                          ),
+
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _passwordField(
+                                  controller: _passCtrl,
+                                  label: locale.t('password'),
+                                  obscure: _obscurePass,
+                                  onToggle: () => setState(() => _obscurePass = !_obscurePass),
+                                  validator: (v) {
+                                    if (v == null || v.isEmpty) return 'Required';
+                                    if (v.length < 6) return 'Min 6 characters';
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _passwordField(
+                                  controller: _confirmPassCtrl,
+                                  label: locale.t('confirm_password'),
+                                  obscure: _obscureConfirm,
+                                  onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                                  validator: (v) {
+                                    if (v == null || v.isEmpty) return locale.t('required');
+                                    if (v != _passCtrl.text) return locale.t('passwords_not_match');
+                                    return null;
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          SizedBox(
+                            height: 52,
+                            child: ElevatedButton(
+                              onPressed: _loading ? null : _register,
+                              child: _loading
+                                  ? const SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                                    )
+                                  : Text(
+                                      locale.t('register_as_distributor'),
+                                      style: AppTextStyles.bodyBold.copyWith(color: Colors.white, fontSize: 16),
+                                    ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          Center(
+                            child: TextButton(
+                              onPressed: _loading ? null : () => Navigator.pop(context),
+                              child: Text(
+                                locale.t('already_have_account'),
+                                style: AppTextStyles.captionBold.copyWith(color: AppColors.milkBlue600),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _heroStep({
+    required String step,
+    required String title,
+    required String desc,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF00E5FF)),
+          ),
+          child: Center(
+            child: Text(
+              step,
+              style: const TextStyle(
+                color: Color(0xFFE2F9FF),
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: AppTextStyles.bodyBold.copyWith(color: Colors.white, fontSize: 14),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                desc,
+                style: AppTextStyles.caption.copyWith(color: const Color(0xFFB0CDEB), fontSize: 12.5),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // MOBILE LAYOUT (Preserved 100%)
+  // ---------------------------------------------------------------------------
+
+  Widget _buildMobileLayout(BuildContext context, LocaleState locale) {
+    return Column(
+      children: [
+        _buildHeader(context, locale),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_error != null) _errorBanner(_error!),
+                  _field(
+                    controller: _companyCtrl,
+                    label: locale.t('company_name'),
+                    hint: 'Bhargavi Distributors',
+                    icon: Icons.business_rounded,
+                    validator: (v) => (v == null || v.trim().isEmpty) ? locale.t('required') : null,
+                  ),
+                  _field(
+                    controller: _nameCtrl,
+                    label: locale.t('distributor_name'),
+                    hint: 'Your full name',
+                    icon: Icons.person_outline,
+                    validator: (v) => (v == null || v.trim().isEmpty) ? locale.t('required') : null,
+                  ),
+                  _field(
+                    controller: _addressCtrl,
+                    label: locale.t('address'),
+                    hint: '123, Dairy Road, Pune',
+                    icon: Icons.location_on_outlined,
+                    maxLines: 2,
+                    validator: (v) => (v == null || v.trim().isEmpty) ? locale.t('required') : null,
+                  ),
+                  _field(
+                    controller: _mobileCtrl,
+                    label: locale.t('mobile_number'),
+                    hint: '9876543210',
+                    icon: Icons.phone_outlined,
+                    keyboardType: TextInputType.phone,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return locale.t('required');
+                      if (v.trim().length < 10) return locale.t('enter_valid_mobile');
+                      return null;
+                    },
+                  ),
+                  _field(
+                    controller: _emailCtrl,
+                    label: locale.t('email'),
+                    hint: 'distributor@email.com',
+                    icon: Icons.email_outlined,
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return locale.t('required');
+                      if (!v.contains('@')) return locale.t('enter_valid_email');
+                      return null;
+                    },
+                  ),
+                  _passwordField(
+                    controller: _passCtrl,
+                    label: locale.t('password'),
+                    obscure: _obscurePass,
+                    onToggle: () => setState(() => _obscurePass = !_obscurePass),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Required';
+                      if (v.length < 6) return 'Min 6 characters';
+                      return null;
+                    },
+                  ),
+                  _passwordField(
+                    controller: _confirmPassCtrl,
+                    label: locale.t('confirm_password'),
+                    obscure: _obscureConfirm,
+                    onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return locale.t('required');
+                      if (v != _passCtrl.text) return locale.t('passwords_not_match');
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: _loading ? null : _register,
+                      child: _loading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                            )
+                          : Text(
+                              locale.t('register_as_distributor'),
+                              style: AppTextStyles.bodyBold.copyWith(color: Colors.white),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: TextButton(
+                      onPressed: _loading ? null : () => Navigator.pop(context),
+                      child: Text(
+                        locale.t('already_have_account'),
+                        style: AppTextStyles.captionBold.copyWith(color: AppColors.milkBlue600),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

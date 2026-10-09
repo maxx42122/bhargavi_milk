@@ -39,57 +39,57 @@ class BvhLogoWidget extends StatelessWidget {
           );
 
     if (!showCard) {
-      return Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF00E5FF).withValues(alpha: 0.25),
-              blurRadius: 28,
-              spreadRadius: 2,
-              offset: const Offset(0, 6),
-            ),
-          ],
+      return RepaintBoundary(
+        child: Container(
+          decoration: BoxDecoration(
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF00E5FF).withValues(alpha: 0.25),
+                blurRadius: 28,
+                spreadRadius: 2,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: logoImage,
         ),
-        child: logoImage,
       );
     }
 
     // 2. Optional frosted white container for high contrast
-    return Container(
-      width: useFullLogo ? size * 1.8 : size * 1.35,
-      height: size * 1.35,
-      padding: EdgeInsets.all(size * 0.12),
-      decoration: BoxDecoration(
-        color: cardColor ?? Colors.white.withValues(alpha: 0.98),
-        borderRadius: BorderRadius.circular(size * 0.25),
-        border: Border.all(
-          color: Colors.white,
-          width: 2.0,
+    return RepaintBoundary(
+      child: Container(
+        width: useFullLogo ? size * 1.8 : size * 1.35,
+        height: size * 1.35,
+        padding: EdgeInsets.all(size * 0.12),
+        decoration: BoxDecoration(
+          color: cardColor ?? Colors.white.withValues(alpha: 0.98),
+          borderRadius: BorderRadius.circular(size * 0.25),
+          border: Border.all(color: Colors.white, width: 2.0),
+          boxShadow: [
+            // Vibrant Cyan/Blue ambient glow
+            BoxShadow(
+              color: const Color(0xFF00E5FF).withValues(alpha: 0.35),
+              blurRadius: 36,
+              spreadRadius: 4,
+              offset: const Offset(0, 8),
+            ),
+            // Deep navy drop shadow
+            BoxShadow(
+              color: const Color(0xFF1A1F4E).withValues(alpha: 0.25),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
-        boxShadow: [
-          // Vibrant Cyan/Blue ambient glow
-          BoxShadow(
-            color: const Color(0xFF00E5FF).withValues(alpha: 0.35),
-            blurRadius: 36,
-            spreadRadius: 4,
-            offset: const Offset(0, 8),
-          ),
-          // Deep navy drop shadow
-          BoxShadow(
-            color: const Color(0xFF1A1F4E).withValues(alpha: 0.25),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        child: Center(child: logoImage),
       ),
-      child: Center(child: logoImage),
     );
   }
 
   Widget _buildVectorFallback(double size) {
-    return CustomPaint(
-      size: Size(size, size),
-      painter: BvhVectorLogoPainter(),
+    return RepaintBoundary(
+      child: CustomPaint(size: Size(size, size), painter: BvhVectorLogoPainter()),
     );
   }
 }
@@ -199,11 +199,7 @@ class BvhVectorLogoPainter extends CustomPainter {
     // Wave Gradient Fill (Cyan to Vibrant Blue)
     final wavePaint = Paint()
       ..shader = const LinearGradient(
-        colors: [
-          Color(0xFF00E5FF),
-          Color(0xFF29B6F6),
-          Color(0xFF1E88E5),
-        ],
+        colors: [Color(0xFF00E5FF), Color(0xFF29B6F6), Color(0xFF1E88E5)],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ).createShader(Rect.fromLTWH(0, 0, w, h))

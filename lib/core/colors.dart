@@ -36,15 +36,18 @@ class AppColors {
   static const Color milkBlue50 = Color(0xFFF0F5FF);
 
   // Dairy Green (Fresh emerald green accents)
+  static const Color dairyGreen800 = Color(0xFF065F46);
   static const Color dairyGreen700 = Color(0xFF0E7A3E);
   static const Color dairyGreen600 = Color(0xFF169E53);
   static const Color dairyGreen500 = Color(0xFF22C55E);
   static const Color dairyGreen300 = Color(0xFF86EFAC);
   static const Color dairyGreen100 = Color(0xFFDCFCE7);
+  static const Color dairyGreen50 = Color(0xFFF0FDF4);
 
   // Background / Surface
   static const Color background = Color(0xFFF5F6F8);
   static const Color cardSurface = Color(0xFFFFFFFF);
+  static const Color inputFill = Color(0xFFF8FAFC);
 
   // Ink (text) mapped to theme tokens
   static const Color ink900 = Color(0xFF1C2536); // Primary Text #1C2536
@@ -54,6 +57,9 @@ class AppColors {
   static const Color ink500 = Color(0xFF9BA1AE); // Muted Text #9BA1AE
   static const Color ink400 = Color(0xFF9BA1AE);
   static const Color ink300 = Color(0xFFCAD0DB);
+  static const Color ink200 = Color(0xFFE2E8F0);
+  static const Color ink100 = Color(0xFFF1F5F9);
+  static const Color ink50 = Color(0xFFF8FAFC);
 
   // Border mapped to borderLight
   static const Color border = Color(0xFFE7EAF0); // #E7EAF0
@@ -64,13 +70,21 @@ class AppColors {
   static const Color amber700 = Color(0xFFB45309);
   static const Color amber600 = Color(0xFFD97706);
   static const Color amber500 = Color(0xFFF59E0B);
+  static const Color amber400 = Color(0xFFFBBF24);
+  static const Color amber300 = Color(0xFFFCD34D);
+  static const Color amber200 = Color(0xFFFDE68A);
   static const Color amber100 = Color(0xFFFEF3C7);
   static const Color amber50 = Color(0xFFFFFBEB);
 
   // Red (error/pending)
+  static const Color red800 = Color(0xFF991B1B);
+  static const Color red700 = Color(0xFFB91C1C);
   static const Color red600 = Color(0xFFDC2626);
   static const Color red500 = Color(0xFFEF4444);
+  static const Color red400 = Color(0xFFF87171);
+  static const Color red300 = Color(0xFFFCA5A5);
   static const Color red100 = Color(0xFFFEE2E2);
+  static const Color red50 = Color(0xFFFEF2F2);
 
   // Gradients
   static const LinearGradient headerGradient = LinearGradient(

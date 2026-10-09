@@ -26,6 +26,9 @@ class PdfReceiptService {
     final distributorAddress = distributorInfo?['address']?.isNotEmpty == true
         ? distributorInfo!['address']!
         : '123, Dairy Road, Pune, Maharashtra';
+    final distributorGstin = distributorInfo?['gstin']?.isNotEmpty == true
+        ? distributorInfo!['gstin']!
+        : (distributorInfo?['gst'] ?? '');
 
     final orderDateStr = order.createdAt != null
         ? DateFormat('dd MMM yyyy, hh:mm a').format(order.createdAt!)
@@ -33,7 +36,8 @@ class PdfReceiptService {
 
     final invoiceNum = 'INV-${order.orderNumber.replaceAll('#', '')}';
     final isPaid = order.paymentStatus.toLowerCase() == 'paid';
-    final txn = transactionId ??
+    final txn =
+        transactionId ??
         'TXN${order.id.length > 8 ? order.id.substring(order.id.length - 8).toUpperCase() : order.id.toUpperCase()}';
 
     pdf.addPage(
@@ -64,32 +68,50 @@ class PdfReceiptService {
                       if (distributorOwner.isNotEmpty)
                         pw.Text(
                           'Prop: $distributorOwner',
-                          style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                          style: const pw.TextStyle(
+                            fontSize: 10,
+                            color: PdfColors.grey700,
+                          ),
                         ),
                       pw.Text(
                         distributorAddress,
-                        style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                        style: const pw.TextStyle(
+                          fontSize: 10,
+                          color: PdfColors.grey700,
+                        ),
                       ),
                       pw.Text(
                         'Phone: $distributorPhone',
-                        style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                        style: const pw.TextStyle(
+                          fontSize: 10,
+                          color: PdfColors.grey700,
+                        ),
                       ),
-                      pw.Text(
-                        'GSTIN: 27AABCB1234F1Z5',
-                        style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
-                      ),
+                      if (distributorGstin.isNotEmpty)
+                        pw.Text(
+                          'GSTIN: $distributorGstin',
+                          style: const pw.TextStyle(
+                            fontSize: 10,
+                            color: PdfColors.grey700,
+                          ),
+                        ),
                     ],
                   ),
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.end,
                     children: [
                       pw.Container(
-                        padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: pw.BoxDecoration(
                           color: isPaid ? PdfColors.green50 : PdfColors.amber50,
                           borderRadius: pw.BorderRadius.circular(6),
                           border: pw.Border.all(
-                            color: isPaid ? PdfColors.green700 : PdfColors.amber700,
+                            color: isPaid
+                                ? PdfColors.green700
+                                : PdfColors.amber700,
                             width: 1,
                           ),
                         ),
@@ -98,22 +120,33 @@ class PdfReceiptService {
                           style: pw.TextStyle(
                             fontSize: 11,
                             fontWeight: pw.FontWeight.bold,
-                            color: isPaid ? PdfColors.green800 : PdfColors.amber800,
+                            color: isPaid
+                                ? PdfColors.green800
+                                : PdfColors.amber800,
                           ),
                         ),
                       ),
                       pw.SizedBox(height: 8),
                       pw.Text(
                         'Invoice No: $invoiceNum',
-                        style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+                        style: pw.TextStyle(
+                          fontSize: 11,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
                       ),
                       pw.Text(
                         'Order No: ${order.orderNumber}',
-                        style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                        style: const pw.TextStyle(
+                          fontSize: 10,
+                          color: PdfColors.grey700,
+                        ),
                       ),
                       pw.Text(
                         'Date: $orderDateStr',
-                        style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                        style: const pw.TextStyle(
+                          fontSize: 10,
+                          color: PdfColors.grey700,
+                        ),
                       ),
                     ],
                   ),
@@ -143,23 +176,37 @@ class PdfReceiptService {
                         ),
                         pw.SizedBox(height: 4),
                         pw.Text(
-                          order.shopName.isNotEmpty ? order.shopName : 'Customer Shop',
-                          style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                          order.shopName.isNotEmpty
+                              ? order.shopName
+                              : 'Customer Shop',
+                          style: pw.TextStyle(
+                            fontSize: 12,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
                         ),
                         if (order.shopOwner.isNotEmpty)
                           pw.Text(
                             'Owner: ${order.shopOwner}',
-                            style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey800),
+                            style: const pw.TextStyle(
+                              fontSize: 10,
+                              color: PdfColors.grey800,
+                            ),
                           ),
                         if (order.shopMobile.isNotEmpty)
                           pw.Text(
                             'Mobile: ${order.shopMobile}',
-                            style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey800),
+                            style: const pw.TextStyle(
+                              fontSize: 10,
+                              color: PdfColors.grey800,
+                            ),
                           ),
                         if (order.deliveryAddress.isNotEmpty)
                           pw.Text(
                             'Address: ${order.deliveryAddress}',
-                            style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey800),
+                            style: const pw.TextStyle(
+                              fontSize: 10,
+                              color: PdfColors.grey800,
+                            ),
                           ),
                       ],
                     ),
@@ -180,24 +227,35 @@ class PdfReceiptService {
                         pw.SizedBox(height: 4),
                         pw.Text(
                           'Slot: ${order.deliveryDate} (${order.deliveryTime})',
-                          style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey800),
+                          style: const pw.TextStyle(
+                            fontSize: 10,
+                            color: PdfColors.grey800,
+                          ),
                         ),
                         pw.Text(
                           'Payment Method: ${order.paymentMethod.toUpperCase()}',
-                          style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey800),
+                          style: const pw.TextStyle(
+                            fontSize: 10,
+                            color: PdfColors.grey800,
+                          ),
                         ),
                         pw.Text(
                           'Payment Status: ${order.paymentStatus.toUpperCase()}',
                           style: pw.TextStyle(
                             fontSize: 10,
                             fontWeight: pw.FontWeight.bold,
-                            color: isPaid ? PdfColors.green700 : PdfColors.red700,
+                            color: isPaid
+                                ? PdfColors.green700
+                                : PdfColors.red700,
                           ),
                         ),
                         if (isPaid)
                           pw.Text(
                             'Transaction Ref: $txn',
-                            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+                            style: const pw.TextStyle(
+                              fontSize: 9,
+                              color: PdfColors.grey700,
+                            ),
                           ),
                       ],
                     ),
@@ -209,7 +267,10 @@ class PdfReceiptService {
 
               // ── Items Table ──
               pw.Table(
-                border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.8),
+                border: pw.TableBorder.all(
+                  color: PdfColors.grey300,
+                  width: 0.8,
+                ),
                 columnWidths: {
                   0: const pw.FlexColumnWidth(4), // Item
                   1: const pw.FlexColumnWidth(2), // Pack
@@ -235,11 +296,19 @@ class PdfReceiptService {
                       return pw.TableRow(
                         children: [
                           _td(item.productName),
-                          _td('${item.packSize} ${item.unit}'.trim(), align: pw.TextAlign.center),
+                          _td(
+                            '${item.packSize} ${item.unit}'.trim(),
+                            align: pw.TextAlign.center,
+                          ),
                           _td('${item.quantity}', align: pw.TextAlign.center),
-                          _td(item.price.toStringAsFixed(2), align: pw.TextAlign.right),
-                          _td((item.quantity * item.price).toStringAsFixed(2),
-                              align: pw.TextAlign.right),
+                          _td(
+                            item.price.toStringAsFixed(2),
+                            align: pw.TextAlign.right,
+                          ),
+                          _td(
+                            (item.quantity * item.price).toStringAsFixed(2),
+                            align: pw.TextAlign.right,
+                          ),
                         ],
                       );
                     })
@@ -250,8 +319,14 @@ class PdfReceiptService {
                           _td(p),
                           _td('-', align: pw.TextAlign.center),
                           _td('1', align: pw.TextAlign.center),
-                          _td(order.totalAmount.toStringAsFixed(2), align: pw.TextAlign.right),
-                          _td(order.totalAmount.toStringAsFixed(2), align: pw.TextAlign.right),
+                          _td(
+                            order.totalAmount.toStringAsFixed(2),
+                            align: pw.TextAlign.right,
+                          ),
+                          _td(
+                            order.totalAmount.toStringAsFixed(2),
+                            align: pw.TextAlign.right,
+                          ),
                         ],
                       );
                     }),
@@ -288,7 +363,10 @@ class PdfReceiptService {
                             '1. Goods once sold will not be returned unless damaged upon delivery.\n'
                             '2. Keep milk and milk products refrigerated at 4°C or below.\n'
                             '3. For inquiries or payment settlement, contact your distributor.',
-                            style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+                            style: const pw.TextStyle(
+                              fontSize: 8,
+                              color: PdfColors.grey700,
+                            ),
                           ),
                         ],
                       ),
@@ -299,7 +377,10 @@ class PdfReceiptService {
                     flex: 4,
                     child: pw.Column(
                       children: [
-                        _summaryPdfRow('Subtotal:', 'Rs ${order.subtotal.toStringAsFixed(2)}'),
+                        _summaryPdfRow(
+                          'Subtotal:',
+                          'Rs ${order.subtotal.toStringAsFixed(2)}',
+                        ),
                         if (order.deliveryCharge > 0)
                           _summaryPdfRow(
                             'Delivery Charge:',
@@ -319,13 +400,19 @@ class PdfReceiptService {
                         pw.SizedBox(height: 4),
                         _summaryPdfRow(
                           'Amount Paid:',
-                          isPaid ? 'Rs ${order.total.toStringAsFixed(2)}' : 'Rs 0.00',
+                          isPaid
+                              ? 'Rs ${order.total.toStringAsFixed(2)}'
+                              : 'Rs 0.00',
                           bold: isPaid,
-                          color: isPaid ? PdfColors.green800 : PdfColors.grey800,
+                          color: isPaid
+                              ? PdfColors.green800
+                              : PdfColors.grey800,
                         ),
                         _summaryPdfRow(
                           'Balance Due:',
-                          isPaid ? 'Rs 0.00' : 'Rs ${order.total.toStringAsFixed(2)}',
+                          isPaid
+                              ? 'Rs 0.00'
+                              : 'Rs ${order.total.toStringAsFixed(2)}',
                           bold: !isPaid,
                           color: isPaid ? PdfColors.green800 : PdfColors.red800,
                         ),
@@ -344,11 +431,17 @@ class PdfReceiptService {
                 children: [
                   pw.Text(
                     'This is a computer-generated tax invoice. No signature required.',
-                    style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+                    style: const pw.TextStyle(
+                      fontSize: 8,
+                      color: PdfColors.grey600,
+                    ),
                   ),
                   pw.Text(
                     'MilkRoute © ${DateTime.now().year} • Bhargavi Milk',
-                    style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+                    style: const pw.TextStyle(
+                      fontSize: 8,
+                      color: PdfColors.grey600,
+                    ),
                   ),
                 ],
               ),

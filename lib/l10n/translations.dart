@@ -1221,4 +1221,161 @@ const Map<String, Map<String, String>> translations = {
     'hi': 'ऑर्डर किए गए आइटम',
     'mr': 'मागवलेले आयटम',
   },
+  // ── Order Settings & Timing Restrictions ──────────────────────────────────
+  'order_settings': {
+    'en': 'Order & Store Settings',
+    'hi': 'ऑर्डर और स्टोर सेटिंग्स',
+    'mr': 'ऑर्डर आणि स्टोअर सेटिंग्ज',
+  },
+  'ordering_hours': {
+    'en': 'Ordering Hours',
+    'hi': 'ऑर्डर करने का समय',
+    'mr': 'ऑर्डर करण्याची वेळ',
+  },
+  'ordering_hours_desc': {
+    'en': 'Configure daily order time limits & payment rules',
+    'hi': 'दैनिक ऑर्डर समय सीमा और भुगतान नियम सेट करें',
+    'mr': 'दैनिक ऑर्डर वेळ मर्यादा आणि पेमेंट नियम सेट करा',
+  },
+  'ordering_window_desc': {
+    'en': 'Set the exact hours when shops are allowed to place orders',
+    'hi': 'दुकानों द्वारा ऑर्डर देने का निश्चित समय निर्धारित करें',
+    'mr': 'दुकानांना ऑर्डर देण्यासाठी निश्चित वेळ ठरवा',
+  },
+  'enable_ordering_window': {
+    'en': 'Enable Ordering Time Limit',
+    'hi': 'ऑर्डर समय सीमा सक्षम करें',
+    'mr': 'ऑर्डर वेळ मर्यादा सुरू करा',
+  },
+  'limit_ordering_time_desc': {
+    'en': 'Shops can only place orders within the selected time window',
+    'hi': 'दुकानें केवल चयनित समय सीमा के दौरान ही ऑर्डर दे सकेंगी',
+    'mr': 'दुकाने केवळ निवडलेल्या वेळेतच ऑर्डर देऊ शकतील',
+  },
+  'start_time': {
+    'en': 'Start Time',
+    'hi': 'शुरू होने का समय',
+    'mr': 'सुरू होण्याची वेळ',
+  },
+  'end_time': {
+    'en': 'End Time',
+    'hi': 'समाप्त होने का समय',
+    'mr': 'समाप्तीची वेळ',
+  },
+  'allowed_hours': {
+    'en': 'Allowed Hours',
+    'hi': 'अनुमत समय',
+    'mr': 'मान्य वेळ',
+  },
+  'ordering_open': {
+    'en': 'Ordering is OPEN',
+    'hi': 'ऑर्डर बुकिंग चालू है',
+    'mr': 'ऑर्डर बुकिंग सुरू आहे',
+  },
+  'ordering_closed': {
+    'en': 'Ordering is CLOSED',
+    'hi': 'ऑर्डर बुकिंग बंद है',
+    'mr': 'ऑर्डर बुकिंग बंद आहे',
+  },
+  'timing_disabled_notice': {
+    'en': 'Ordering is open 24/7 (No time restrictions active)',
+    'hi': 'ऑर्डर 24/7 खुले हैं (कोई समय सीमा नहीं)',
+    'mr': 'ऑर्डर २४/७ चालू आहेत (कोणतीही वेळ मर्यादा नाही)',
+  },
+  'quick_presets': {
+    'en': 'Quick Presets',
+    'hi': 'त्वरित प्रीसेट',
+    'mr': 'द्रुत प्रीसेट',
+  },
+  'active_ordering_days': {
+    'en': 'Active Ordering Days',
+    'hi': 'सक्रिय ऑर्डर के दिन',
+    'mr': 'सक्रिय ऑर्डरचे दिवस',
+  },
+  'payment_rules_title': {
+    'en': 'Payment & Unpaid Bill Rules',
+    'hi': 'भुगतान एवं बकाया बिल नियम',
+    'mr': 'पेमेंट आणि थकबाकी बिल नियम',
+  },
+  'payment_rules_desc': {
+    'en': 'Prevent new orders if previous bills or payments are pending',
+    'hi': 'पिछला भुगतान बकाया होने पर नए ऑर्डर रोकें',
+    'mr': 'मागील पेमेंट बाकी असल्यास नवीन ऑर्डर थांबवा',
+  },
+  'block_pending_payment': {
+    'en': 'Block Orders on Pending Payment',
+    'hi': 'बकाया भुगतान पर नए ऑर्डर रोकें',
+    'mr': 'थकबाकी पेमेंट असल्यास ऑर्डर थांबवा',
+  },
+  'block_pending_payment_desc': {
+    'en': 'Shops with unpaid balance cannot place orders until bills are cleared',
+    'hi': 'जिन दुकानों का बिल बकाया है वे भुगतान होने तक नया ऑर्डर नहीं दे सकतीं',
+    'mr': 'ज्या दुकानांचे बिल बाकी आहे ते पैसे भरेपर्यंत नवीन ऑर्डर देऊ शकत नाहीत',
+  },
+  'pending_payment_rule_info': {
+    'en': 'When enabled, shops with any pending balance will be prompted to clear their bills before placing a new order.',
+    'hi': 'सक्षम होने पर, बकाया राशि वाली दुकानों को नया ऑर्डर देने से पहले बिल चुकाने के लिए कहा जाएगा।',
+    'mr': 'सुरू केल्यावर, थकबाकी असलेल्या दुकानांना नवीन ऑर्डर देण्यापूर्वी बिल भरण्यास सांगितले जाईल.',
+  },
+  'credit_limit_tolerance': {
+    'en': 'Pending Payment Tolerance / Credit Limit',
+    'hi': 'बकाया भुगतान सहिष्णुता / क्रेडिट सीमा',
+    'mr': 'थकबाकी पेमेंट मर्यादा / क्रेडिट मर्यादा',
+  },
+  'tolerance_helper_text': {
+    'en': 'Set ₹0 for strict blocking on any pending amount',
+    'hi': 'किसी भी बकाया राशि पर रोकने के लिए ₹0 रखें',
+    'mr': 'कोणत्याही थकबाकीवर थांबवण्यासाठी ₹0 ठेवा',
+  },
+  'store_notice_title': {
+    'en': 'Store Notice / Booking Notice',
+    'hi': 'स्टोर सूचना / बुकिंग सूचना',
+    'mr': 'स्टोअर सूचना / बुकिंग सूचना',
+  },
+  'store_notice_desc': {
+    'en': 'Custom message shown to shops when ordering is closed',
+    'hi': 'ऑर्डर बंद होने पर दुकानों को दिखने वाला संदेश',
+    'mr': 'ऑर्डर बंद असताना दुकानांना दिसणारा संदेश',
+  },
+  'custom_closed_notice_label': {
+    'en': 'Custom Announcement / Closed Message',
+    'hi': 'कस्टम घोषणा / बंद होने का संदेश',
+    'mr': 'सानुकूल घोषणा / बंद असल्याचा संदेश',
+  },
+  'save_settings': {
+    'en': 'Save Settings',
+    'hi': 'सेटिंग्स सेव करें',
+    'mr': 'सेटिंग्ज सेव्ह करा',
+  },
+  'store_rules_saved': {
+    'en': 'Order settings saved successfully!',
+    'hi': 'ऑर्डर सेटिंग्स सफलतापूर्वक सेव हो गईं!',
+    'mr': 'ऑर्डर सेटिंग्ज यशस्वीरित्या सेव्ह केल्या!',
+  },
+  'pending_payment_blocked_title': {
+    'en': 'Previous Payment Pending',
+    'hi': 'पिछला भुगतान बकाया है',
+    'mr': 'मागील पेमेंट थकबाकी आहे',
+  },
+  'pending_payment_blocked_msg': {
+    'en': 'You have an outstanding balance. Please clear your pending bills to place new orders.',
+    'hi': 'आपकी बकाया राशि लंबित है। कृपया नया ऑर्डर देने के लिए अपने बिल का भुगतान करें।',
+    'mr': 'तुमची थकबाकी शिल्लक आहे. नवीन ऑर्डर देण्यासाठी कृपया तुमचे बिल भरा.',
+  },
+  'pay_bills_now': {
+    'en': 'Pay Pending Bills',
+    'hi': 'बकाया बिल का भुगतान करें',
+    'mr': 'थकबाकी बिल भरा',
+  },
+  'ordering_closed_banner': {
+    'en': 'Ordering is currently closed',
+    'hi': 'ऑर्डर बुकिंग वर्तमान में बंद है',
+    'mr': 'ऑर्डर बुकिंग सध्या बंद आहे',
+  },
+  'orders_accepted_between': {
+    'en': 'Orders accepted between',
+    'hi': 'ऑर्डर स्वीकार किए जाते हैं:',
+    'mr': 'ऑर्डर स्वीकारण्याची वेळ:',
+  },
 };
+

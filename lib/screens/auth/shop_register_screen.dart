@@ -259,250 +259,564 @@ class _ShopRegisterScreenState extends State<ShopRegisterScreen> {
     return 'Registration failed. Please try again.';
   }
 
-  // ---------------------------------------------------------------------------
-  // BUILD
-  // ---------------------------------------------------------------------------
-
   @override
   Widget build(BuildContext context) {
     final locale = LocaleScope.of(context);
+    final isWide = MediaQuery.of(context).size.width >= 960;
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Column(
-        children: [
-          _buildHeader(context),
+      body: isWide
+          ? _buildDesktopLayout(context, locale)
+          : _buildMobileLayout(context, locale),
+    );
+  }
 
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Form(
-                key: _formKey,
+  // ---------------------------------------------------------------------------
+  // DESKTOP LAYOUT
+  // ---------------------------------------------------------------------------
+
+  Widget _buildDesktopLayout(BuildContext context, LocaleState locale) {
+    return Row(
+      children: [
+        // Left Hero Panel
+        Expanded(
+          flex: 45,
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF09223D),
+                  Color(0xFF0F3D66),
+                  Color(0xFF003087),
+                  Color(0xFF0047FF),
+                ],
+              ),
+            ),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(48),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (_error != null) _errorBanner(_error!),
-
-                    // SHOP NAME
-                    _field(
-                      controller: _shopNameCtrl,
-                      label: 'Shop Name',
-                      hint: 'Sharma Kirana Store',
-                      icon: Icons.store_outlined,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Shop name is required';
-                        }
-                        return null;
-                      },
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back, color: Colors.white),
+                          onPressed: _loading ? null : () => Navigator.pop(context),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 44,
+                          height: 44,
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const BvhLogoWidget(size: 34, showCard: false),
+                        ),
+                        const SizedBox(width: 14),
+                        Text(
+                          locale.t('app_name'),
+                          style: AppTextStyles.h3.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
                     ),
-
-                    // OWNER NAME
-                    _field(
-                      controller: _ownerNameCtrl,
-                      label: 'Owner Name',
-                      hint: 'Rajesh Sharma',
-                      icon: Icons.person_outline,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Owner name is required';
-                        }
-                        return null;
-                      },
+                    const Spacer(),
+                    Text(
+                      'Direct Dairy Supply\nFor Your Retail Shop',
+                      style: AppTextStyles.displayMedium.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
                     ),
-
-                    // MOBILE
-                    _field(
-                      controller: _mobileCtrl,
-                      label: 'Mobile Number',
-                      hint: '9876543210',
-                      icon: Icons.phone_outlined,
-                      keyboardType: TextInputType.phone,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Mobile number is required';
-                        }
-
-                        final mobile = value.trim();
-
-                        if (!RegExp(r'^[0-9]{10}$').hasMatch(mobile)) {
-                          return 'Enter valid 10 digit mobile number';
-                        }
-
-                        return null;
-                      },
+                    const SizedBox(height: 14),
+                    Text(
+                      'Order fresh milk, curd, paneer, and butter directly from your distributor before daily cut-off. Guaranteed morning delivery.',
+                      style: AppTextStyles.body.copyWith(
+                        color: const Color(0xFFD4E6FA),
+                        fontSize: 16,
+                      ),
                     ),
-
-                    // ADDRESS
-                    _field(
-                      controller: _addressCtrl,
-                      label: 'Address',
-                      hint: '12, MG Road, Pune',
-                      icon: Icons.location_on_outlined,
-                      maxLines: 2,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Address is required';
-                        }
-                        return null;
-                      },
+                    const SizedBox(height: 36),
+                    _heroStep(
+                      step: '1',
+                      title: 'Register Shop Details',
+                      desc: 'Enter your shop name, address, and mobile number.',
                     ),
-
-                    // EMAIL
-                    _field(
-                      controller: _emailCtrl,
-                      label: 'Email Address',
-                      hint: 'shop@email.com',
-                      icon: Icons.email_outlined,
-                      keyboardType: TextInputType.emailAddress,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Email is required';
-                        }
-
-                        final email = value.trim();
-
-                        if (!RegExp(
-                          r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-                        ).hasMatch(email)) {
-                          return 'Enter valid email address';
-                        }
-
-                        return null;
-                      },
+                    const SizedBox(height: 16),
+                    _heroStep(
+                      step: '2',
+                      title: 'Select Your Distributor',
+                      desc: 'Choose your local distributor to view products and pricing.',
                     ),
-
-                    // DISTRIBUTOR SELECTOR
-                    _buildDistributorSelector(locale),
-
-                    // PASSWORD
-                    _passwordField(
-                      controller: _passCtrl,
-                      label: locale.t('password'),
-                      obscure: _obscurePass,
-                      onToggle: () {
-                        setState(() {
-                          _obscurePass = !_obscurePass;
-                        });
-                      },
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Password is required';
-                        }
-
-                        if (value.length < 6) {
-                          return 'Min 6 characters';
-                        }
-
-                        return null;
-                      },
+                    const SizedBox(height: 16),
+                    _heroStep(
+                      step: '3',
+                      title: 'Approval & Ordering',
+                      desc: 'Once verified, start placing daily milk orders with one click.',
                     ),
-
-                    // CONFIRM PASSWORD
-                    _passwordField(
-                      controller: _confirmPassCtrl,
-                      label: 'Confirm Password',
-                      obscure: _obscureConfirm,
-                      onToggle: () {
-                        setState(() {
-                          _obscureConfirm = !_obscureConfirm;
-                        });
-                      },
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Confirm your password';
-                        }
-
-                        if (value != _passCtrl.text) {
-                          return 'Passwords do not match';
-                        }
-
-                        return null;
-                      },
-                    ),
-
-                    const SizedBox(height: 4),
-
-                    // INFO
+                    const Spacer(),
                     Container(
-                      padding: const EdgeInsets.all(12),
-                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: AppColors.milkBlue50,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.milkBlue100),
+                        color: Colors.white.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.white24),
                       ),
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(
-                            Icons.info_outline,
-                            color: AppColors.milkBlue600,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 8),
+                          const Icon(Icons.shield_outlined, color: Color(0xFF00E5FF)),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              'Your registration request will be sent to '
-                              'the selected distributor. Your account will '
-                              'remain pending until the distributor approves it.',
-                              style: AppTextStyles.caption.copyWith(
-                                color: AppColors.milkBlue700,
+                              'Direct Distributor Pricing • Accurate Ledgers • Automated UPI',
+                              style: AppTextStyles.captionBold.copyWith(
+                                color: Colors.white,
+                                fontSize: 12,
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
-
-                    // REGISTER BUTTON
-                    SizedBox(
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: _loading ? null : _register,
-                        child: _loading
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2.5,
-                                ),
-                              )
-                            : Text(
-                                'Register & Send Request',
-                                style: AppTextStyles.bodyBold.copyWith(
-                                  color: Colors.white,
-                                ),
-                              ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // LOGIN
-                    Center(
-                      child: TextButton(
-                        onPressed: _loading
-                            ? null
-                            : () => Navigator.pop(context),
-                        child: Text(
-                          'Already have an account? Login',
-                          style: AppTextStyles.captionBold.copyWith(
-                            color: AppColors.milkBlue600,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
                   ],
                 ),
               ),
             ),
           ),
-        ],
-      ),
+        ),
+
+        // Right Form Panel
+        Expanded(
+          flex: 55,
+          child: Container(
+            color: const Color(0xFFF8FAFC),
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 40),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 640),
+                  child: Container(
+                    padding: const EdgeInsets.all(36),
+                    decoration: BoxDecoration(
+                      color: AppColors.cardSurface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.darkNavy.withValues(alpha: 0.05),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Shop Registration',
+                                    style: AppTextStyles.h3,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Register your shop to order from distributors',
+                                    style: AppTextStyles.caption.copyWith(
+                                      color: AppColors.ink500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const LanguagePillButton(),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          if (_error != null) _errorBanner(_error!),
+
+                          // 2-Column Grid for Shop & Owner Name
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _field(
+                                  controller: _shopNameCtrl,
+                                  label: 'Shop Name',
+                                  hint: 'Sharma Kirana Store',
+                                  icon: Icons.store_outlined,
+                                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Shop name is required' : null,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _field(
+                                  controller: _ownerNameCtrl,
+                                  label: 'Owner Name',
+                                  hint: 'Rajesh Sharma',
+                                  icon: Icons.person_outline,
+                                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Owner name is required' : null,
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _field(
+                                  controller: _mobileCtrl,
+                                  label: 'Mobile Number',
+                                  hint: '9876543210',
+                                  icon: Icons.phone_outlined,
+                                  keyboardType: TextInputType.phone,
+                                  validator: (v) {
+                                    if (v == null || v.trim().isEmpty) return 'Mobile number is required';
+                                    if (!RegExp(r'^[0-9]{10}$').hasMatch(v.trim())) return 'Enter valid 10 digit mobile';
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _field(
+                                  controller: _emailCtrl,
+                                  label: 'Email Address',
+                                  hint: 'shop@email.com',
+                                  icon: Icons.email_outlined,
+                                  keyboardType: TextInputType.emailAddress,
+                                  validator: (v) {
+                                    if (v == null || v.trim().isEmpty) return 'Email is required';
+                                    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v.trim())) return 'Enter valid email';
+                                    return null;
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          _field(
+                            controller: _addressCtrl,
+                            label: 'Shop Address',
+                            hint: '12, MG Road, Pune',
+                            icon: Icons.location_on_outlined,
+                            maxLines: 2,
+                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Address is required' : null,
+                          ),
+
+                          _buildDistributorSelector(locale),
+
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _passwordField(
+                                  controller: _passCtrl,
+                                  label: locale.t('password'),
+                                  obscure: _obscurePass,
+                                  onToggle: () => setState(() => _obscurePass = !_obscurePass),
+                                  validator: (v) {
+                                    if (v == null || v.isEmpty) return 'Password is required';
+                                    if (v.length < 6) return 'Min 6 characters';
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _passwordField(
+                                  controller: _confirmPassCtrl,
+                                  label: 'Confirm Password',
+                                  obscure: _obscureConfirm,
+                                  onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                                  validator: (v) {
+                                    if (v == null || v.isEmpty) return 'Confirm your password';
+                                    if (v != _passCtrl.text) return 'Passwords do not match';
+                                    return null;
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: AppColors.milkBlue50,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppColors.milkBlue100),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.info_outline, color: AppColors.milkBlue600, size: 18),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Your registration request will be sent to the selected distributor. Your account will remain pending until the distributor approves it.',
+                                    style: AppTextStyles.caption.copyWith(color: AppColors.milkBlue700),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          SizedBox(
+                            height: 52,
+                            child: ElevatedButton(
+                              onPressed: _loading ? null : _register,
+                              child: _loading
+                                  ? const SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                                    )
+                                  : Text(
+                                      'Register & Send Request',
+                                      style: AppTextStyles.bodyBold.copyWith(color: Colors.white, fontSize: 16),
+                                    ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          Center(
+                            child: TextButton(
+                              onPressed: _loading ? null : () => Navigator.pop(context),
+                              child: Text(
+                                'Already have an account? Login',
+                                style: AppTextStyles.captionBold.copyWith(color: AppColors.milkBlue600),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _heroStep({
+    required String step,
+    required String title,
+    required String desc,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF00E5FF)),
+          ),
+          child: Center(
+            child: Text(
+              step,
+              style: const TextStyle(
+                color: Color(0xFFE2F9FF),
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: AppTextStyles.bodyBold.copyWith(color: Colors.white, fontSize: 14),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                desc,
+                style: AppTextStyles.caption.copyWith(color: const Color(0xFFB0CDEB), fontSize: 12.5),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // MOBILE LAYOUT (Preserved 100%)
+  // ---------------------------------------------------------------------------
+
+  Widget _buildMobileLayout(BuildContext context, LocaleState locale) {
+    return Column(
+      children: [
+        _buildHeader(context),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_error != null) _errorBanner(_error!),
+                  _field(
+                    controller: _shopNameCtrl,
+                    label: 'Shop Name',
+                    hint: 'Sharma Kirana Store',
+                    icon: Icons.store_outlined,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) return 'Shop name is required';
+                      return null;
+                    },
+                  ),
+                  _field(
+                    controller: _ownerNameCtrl,
+                    label: 'Owner Name',
+                    hint: 'Rajesh Sharma',
+                    icon: Icons.person_outline,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) return 'Owner name is required';
+                      return null;
+                    },
+                  ),
+                  _field(
+                    controller: _mobileCtrl,
+                    label: 'Mobile Number',
+                    hint: '9876543210',
+                    icon: Icons.phone_outlined,
+                    keyboardType: TextInputType.phone,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) return 'Mobile number is required';
+                      final mobile = value.trim();
+                      if (!RegExp(r'^[0-9]{10}$').hasMatch(mobile)) return 'Enter valid 10 digit mobile number';
+                      return null;
+                    },
+                  ),
+                  _field(
+                    controller: _addressCtrl,
+                    label: 'Address',
+                    hint: '12, MG Road, Pune',
+                    icon: Icons.location_on_outlined,
+                    maxLines: 2,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) return 'Address is required';
+                      return null;
+                    },
+                  ),
+                  _field(
+                    controller: _emailCtrl,
+                    label: 'Email Address',
+                    hint: 'shop@email.com',
+                    icon: Icons.email_outlined,
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) return 'Email is required';
+                      final email = value.trim();
+                      if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) return 'Enter valid email address';
+                      return null;
+                    },
+                  ),
+                  _buildDistributorSelector(locale),
+                  _passwordField(
+                    controller: _passCtrl,
+                    label: locale.t('password'),
+                    obscure: _obscurePass,
+                    onToggle: () => setState(() => _obscurePass = !_obscurePass),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return 'Password is required';
+                      if (value.length < 6) return 'Min 6 characters';
+                      return null;
+                    },
+                  ),
+                  _passwordField(
+                    controller: _confirmPassCtrl,
+                    label: 'Confirm Password',
+                    obscure: _obscureConfirm,
+                    onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return 'Confirm your password';
+                      if (value != _passCtrl.text) return 'Passwords do not match';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: AppColors.milkBlue50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.milkBlue100),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.info_outline, color: AppColors.milkBlue600, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Your registration request will be sent to the selected distributor. Your account will remain pending until the distributor approves it.',
+                            style: AppTextStyles.caption.copyWith(color: AppColors.milkBlue700),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: _loading ? null : _register,
+                      child: _loading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                            )
+                          : Text(
+                              'Register & Send Request',
+                              style: AppTextStyles.bodyBold.copyWith(color: Colors.white),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: TextButton(
+                      onPressed: _loading ? null : () => Navigator.pop(context),
+                      child: Text(
+                        'Already have an account? Login',
+                        style: AppTextStyles.captionBold.copyWith(color: AppColors.milkBlue600),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

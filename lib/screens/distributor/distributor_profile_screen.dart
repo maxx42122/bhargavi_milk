@@ -8,6 +8,7 @@ import '../../core/text_styles.dart';
 import '../../services/auth_service.dart';
 import '../../state/locale_state.dart';
 import '../auth/login_screen.dart';
+import 'distributor_settings_screen.dart';
 
 class DistributorProfileScreen extends StatelessWidget {
   const DistributorProfileScreen({super.key});
@@ -228,6 +229,70 @@ class DistributorProfileScreen extends StatelessWidget {
                       label: 'Distributor ID',
                       value: user.uid,
                       copyable: true,
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Order & Store Settings Button
+                    InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const DistributorSettingsScreen(),
+                        ),
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.milkBlue50,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: AppColors.milkBlue200,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: const BoxDecoration(
+                                color: AppColors.milkBlue600,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.schedule_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    locale.t('order_settings'),
+                                    style: AppTextStyles.bodyBold.copyWith(
+                                      color: AppColors.milkBlue900,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    locale.t('ordering_hours_desc'),
+                                    style: AppTextStyles.caption.copyWith(
+                                      color: AppColors.milkBlue800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              color: AppColors.milkBlue600,
+                              size: 16,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
 
                     const SizedBox(height: 24),

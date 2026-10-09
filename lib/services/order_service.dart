@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'distributor_settings_service.dart';
 
 class OrderItem {
   final String productId;
@@ -329,8 +330,57 @@ class OrderService {
 
     final initialStatus = (orderStatus ?? status).toLowerCase();
 
+    // 4. Validate Distributor Ordering Rules (Timing Window & Pending Payments)
     try {
-      // 4. Generate new document at /distributor/{distributorId}/orders/{orderId}
+      final settings = await DistributorSettingsService.fetchSettings(distributorId.trim());
+
+      // Check Ordering Window
+      if (settings.orderTimingEnabled) {
+        final timeCheck = DistributorSettingsService.isWithinOrderingHours(settings);
+        if (!timeCheck.isOpen) {
+          final msg = settings.customClosedNotice.isNotEmpty
+              ? settings.customClosedNotice
+              : 'Ordering is currently closed. Allowed order window is ${settings.startTimeFormatted} to ${settings.endTimeFormatted}.';
+          throw Exception(msg);
+        }
+      }
+
+      // Check Pending Payment Restriction
+      if (settings.blockOnPendingPayment) {
+        // Fetch shop's current outstanding balance
+        final shopDoc = await _db
+            .collection('distributor')
+            .doc(distributorId.trim())
+            .collection('shops')
+            .doc(shopId)
+            .get();
+
+        double outstanding = 0.0;
+        if (shopDoc.exists) {
+          final outRaw = shopDoc.data()?['outstanding'];
+          outstanding = (outRaw is num)
+              ? outRaw.toDouble()
+              : (double.tryParse(outRaw?.toString() ?? '0') ?? 0.0);
+        }
+
+        if (outstanding > settings.maxPendingTolerance) {
+          final formattedPending = outstanding.toStringAsFixed(
+            outstanding % 1 == 0 ? 0 : 2,
+          );
+          throw Exception(
+            'Previous payment is pending (₹$formattedPending). Please clear your pending bills before placing new orders.',
+          );
+        }
+      }
+    } catch (e) {
+      if (e.toString().contains('Ordering is') || e.toString().contains('Previous payment')) {
+        rethrow;
+      }
+      debugPrint('Settings check warning (continuing): $e');
+    }
+
+    try {
+      // 5. Generate new document at /distributor/{distributorId}/orders/{orderId}
       final ordersCollection = _ordersRef(distributorId.trim());
       final newOrderDoc = ordersCollection.doc();
       final orderId = newOrderDoc.id;

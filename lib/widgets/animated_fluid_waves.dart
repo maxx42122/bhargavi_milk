@@ -16,19 +16,21 @@ class AnimatedFluidWaves extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: height,
-      width: double.infinity,
-      child: CustomPaint(
-        painter: _FluidWavePainter(
-          animation: animation,
-          waveColors: waveColors ??
-              [
-                const Color(0xFF1B7BD6).withValues(alpha: 0.18),
-                const Color(0xFF3B94E8).withValues(alpha: 0.28),
-                const Color(0xFF70B8F8).withValues(alpha: 0.40),
-                Colors.white.withValues(alpha: 0.85),
-              ],
+    return RepaintBoundary(
+      child: SizedBox(
+        height: height,
+        width: double.infinity,
+        child: CustomPaint(
+          painter: _FluidWavePainter(
+            animation: animation,
+            waveColors: waveColors ??
+                [
+                  const Color(0xFF1B7BD6).withValues(alpha: 0.18),
+                  const Color(0xFF3B94E8).withValues(alpha: 0.28),
+                  const Color(0xFF70B8F8).withValues(alpha: 0.40),
+                  Colors.white.withValues(alpha: 0.85),
+                ],
+          ),
         ),
       ),
     );
@@ -110,11 +112,14 @@ class _FluidWavePainter extends CustomPainter {
     path.moveTo(0, size.height);
     path.lineTo(0, baseY);
 
-    final step = 4.0;
+    final step = math.max(12.0, size.width / 75.0);
     for (double x = 0; x <= size.width; x += step) {
       final y = baseY + amplitude * math.sin((x / wavelength) * 2 * math.pi + phase);
       path.lineTo(x, y);
     }
+    // Ensure smooth termination at right edge
+    final finalY = baseY + amplitude * math.sin((size.width / wavelength) * 2 * math.pi + phase);
+    path.lineTo(size.width, finalY);
 
     path.lineTo(size.width, size.height);
     path.close();
@@ -139,9 +144,11 @@ class AmbientGlowParticles extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _ParticlesPainter(animation: animation, count: count),
-      size: Size.infinite,
+    return RepaintBoundary(
+      child: CustomPaint(
+        painter: _ParticlesPainter(animation: animation, count: count),
+        size: Size.infinite,
+      ),
     );
   }
 }
@@ -181,7 +188,7 @@ class _ParticlesPainter extends CustomPainter {
 
       final paint = Paint()
         ..color = p.color.withValues(alpha: p.alpha)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, p.radius * 0.6);
+        ..style = PaintingStyle.fill;
 
       canvas.drawCircle(Offset(x, y), p.radius, paint);
     }

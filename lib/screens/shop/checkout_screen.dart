@@ -8,10 +8,12 @@ import '../../core/colors.dart';
 import '../../core/text_styles.dart';
 import '../../services/order_service.dart';
 import '../../services/product_service.dart';
+import '../../services/distributor_settings_service.dart';
 import '../../state/auth_state.dart';
 import '../../state/locale_state.dart';
 import '../../widgets/gradient_header.dart';
 import 'order_success_screen.dart';
+import 'shop_payment_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final String distributorId;
@@ -199,6 +201,72 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
 
     debugPrint('Distributor ID: $distributorId');
+
+    // ----------------------------------------------------------
+    // VALIDATE DISTRIBUTOR ORDERING RULES (TIMING & PENDING PAYMENT)
+    // ----------------------------------------------------------
+    final settings = await DistributorSettingsService.fetchSettings(distributorId);
+    final shopProfile = auth.shopProfile;
+    final eligibility = DistributorSettingsService.checkEligibility(
+      shopProfile: shopProfile,
+      settings: settings,
+    );
+
+    if (!eligibility.canOrder) {
+      if (!mounted) return;
+
+      if (eligibility.isPaymentBlocked) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded, color: AppColors.red600),
+                const SizedBox(width: 10),
+                Text(locale.t('pending_payment_blocked_title')),
+              ],
+            ),
+            content: Text(eligibility.statusMessage),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(locale.t('close')),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.red600,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ShopPaymentScreen(
+                        amountDue: eligibility.pendingAmount,
+                        distributorId: distributorId,
+                      ),
+                    ),
+                  );
+                },
+                child: Text(locale.t('pay_bills_now')),
+              ),
+            ],
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(eligibility.statusMessage),
+            backgroundColor: AppColors.amber700,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+      return;
+    }
 
     setState(() {
       _isPlacingOrder = true;
@@ -1259,38 +1327,157 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   const SizedBox(height: 20),
 
                   // ==================================================
-                  // PLACE ORDER BUTTON
+                  // ELIGIBILITY CHECK & PLACE ORDER BUTTON
                   // ==================================================
-                  SizedBox(
-                    width: double.infinity,
-
-                    height: 52,
-
-                    child: ElevatedButton(
-                      onPressed: _isPlacingOrder
-                          ? null
-                          : () => _handlePlaceOrder(locale, auth),
-
-                      child: _isPlacingOrder
-                          ? const SizedBox(
-                              width: 24,
-
-                              height: 24,
-
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              _paymentMethod == 'upi'
-                                  ? 'Pay ₹${widget.total.toStringAsFixed(0)}'
-                                  : locale.t('place_order'),
-
-                              style: const TextStyle(fontSize: 16),
-                            ),
+                  StreamBuilder<DistributorOrderSettings>(
+                    stream: DistributorSettingsService.streamSettings(
+                      widget.distributorId.isNotEmpty
+                          ? widget.distributorId
+                          : (auth.distributorId ?? auth.shopProfile?.distributorId ?? ''),
                     ),
+                    builder: (context, settingsSnap) {
+                      final settings = settingsSnap.data ?? const DistributorOrderSettings();
+                      final eligibility = DistributorSettingsService.checkEligibility(
+                        shopProfile: auth.shopProfile,
+                        settings: settings,
+                      );
+
+                      if (eligibility.isTimeBlocked) {
+                        return Column(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.amber50,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.amber300),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.lock_clock_rounded, color: AppColors.amber800, size: 20),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      eligibility.statusMessage,
+                                      style: AppTextStyles.caption.copyWith(
+                                        color: AppColors.amber900,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 52,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.ink300,
+                                  foregroundColor: Colors.white,
+                                ),
+                                onPressed: null,
+                                child: Text(
+                                  '${locale.t("ordering_closed")} (${settings.startTimeFormatted}–${settings.endTimeFormatted})',
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+
+                      if (eligibility.isPaymentBlocked) {
+                        final formattedPending = eligibility.pendingAmount.toStringAsFixed(
+                          eligibility.pendingAmount % 1 == 0 ? 0 : 2,
+                        );
+
+                        return Column(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.red50,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.red300),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.error_outline_rounded, color: AppColors.red600, size: 20),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Previous payment is pending (₹$formattedPending). Clear bills to order.',
+                                      style: AppTextStyles.caption.copyWith(
+                                        color: AppColors.red800,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 52,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.red600,
+                                  foregroundColor: Colors.white,
+                                  elevation: 2,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.payment_rounded, size: 20),
+                                label: Text(
+                                  '${locale.t("pay_bills_now")} (₹$formattedPending)',
+                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                                ),
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ShopPaymentScreen(
+                                        amountDue: eligibility.pendingAmount,
+                                        distributorId: widget.distributorId,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+
+                      return SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: ElevatedButton(
+                          onPressed: _isPlacingOrder
+                              ? null
+                              : () => _handlePlaceOrder(locale, auth),
+                          child: _isPlacingOrder
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Text(
+                                  _paymentMethod == 'upi'
+                                      ? 'Pay ₹${widget.total.toStringAsFixed(0)}'
+                                      : locale.t('place_order'),
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                        ),
+                      );
+                    },
                   ),
 
                   const SizedBox(height: 16),
